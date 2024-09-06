@@ -8,6 +8,7 @@ import pathlib
 import random
 import time
 import traceback
+
 import numpy as np
 
 from vtamp.environments.utils import Action, State
@@ -88,9 +89,9 @@ class CaP(Policy):
             except Exception as e:
                 # Get the traceback as a string
                 error_message = traceback.format_exc()
-                log.info("Code error: "+str(error_message))
+                log.info("Code error: " + str(error_message))
                 return None, statistics
-            
+
             if self.gaussian_blur:
                 st = time.time()
                 blurred_plan, csp_samples = guassian_rejection_sample(
@@ -102,7 +103,7 @@ class CaP(Policy):
                 if blurred_plan is not None:
                     self.plan = blurred_plan[1:]
                     return blurred_plan[0], statistics
-            
+
             self.plan = ground_plan[1:]
             return ground_plan[0], statistics
 

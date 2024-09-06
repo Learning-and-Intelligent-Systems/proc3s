@@ -104,8 +104,8 @@ def query_llm(messages, seed, max_retries=5):
             completion = openai_client.chat.completions.create(
                 model=ENGINE, messages=messages, seed=seed, temperature=0
             )
-      
-            return str(completion.choices[0].message.content), time.time()-st
+
+            return str(completion.choices[0].message.content), time.time() - st
         except openai.RateLimitError as e:
             retry_count += 1
             if retry_count > max_retries:

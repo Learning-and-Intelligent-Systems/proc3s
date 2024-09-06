@@ -539,7 +539,7 @@ class RavenEnv(Environment):
         twin_env = RavenEnv(
             task=task,
             teleport=True,
-            render=False,
+            render=render,
             is_twin=True,
             stability_check=real_env.stability_check,
         )

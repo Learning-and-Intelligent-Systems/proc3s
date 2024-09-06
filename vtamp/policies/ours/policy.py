@@ -179,10 +179,10 @@ class Ours(Policy):
 
             chat_history.append({"role": "assistant", "content": llm_response})
             save_log(output_fn, llm_response)
-            
+
             error_message = None
             ground_plan = None
-            
+
             try:
                 llm_code = parse_code(llm_response)
                 exec(llm_code, globals())
@@ -202,7 +202,7 @@ class Ours(Policy):
             except Exception as e:
                 # Get the traceback as a string
                 error_message = traceback.format_exc()
-                log.info("Code error: "+str(error_message))
+                log.info("Code error: " + str(error_message))
 
             if ground_plan is not None and error_message is None:
                 return ground_plan, statistics

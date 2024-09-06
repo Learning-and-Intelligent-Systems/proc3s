@@ -6,6 +6,7 @@ import os
 import pathlib
 import time
 import traceback
+
 from vtamp.environments.utils import Action, State
 from vtamp.policies.utils import (
     Policy,
@@ -93,24 +94,28 @@ class LLM3(Policy):
                     for ai, action in enumerate(ground_plan):
                         _, _, _, info = self.twin.step(action)
                         if len(info["constraint_violations"]) > 0:
-                            violation_str += "Step {}, Action {}, Violations: {}\n".format(
-                                ai, action.name, info["constraint_violations"]
+                            violation_str += (
+                                "Step {}, Action {}, Violations: {}\n".format(
+                                    ai, action.name, info["constraint_violations"]
+                                )
                             )
                             break
                 except Exception as e:
                     # Get the traceback as a string
                     error_message = traceback.format_exc()
-                    log.info("Code error: "+str(error_message))
+                    log.info("Code error: " + str(error_message))
 
                 if len(violation_str) > 0 and self.max_feedbacks > iter:
-                    if(error_message is not None):
+                    if error_message is not None:
                         # There was an error in code execution
                         failure_response = error_message
                     else:
                         if self.gaussian_blur:
                             st = time.time()
                             blurred_plan, csp_samples = guassian_rejection_sample(
-                                self.twin, ground_plan, max_attempts=self.max_csp_samples
+                                self.twin,
+                                ground_plan,
+                                max_attempts=self.max_csp_samples,
                             )
                             statistics["csp_samples"] += csp_samples
                             statistics["csp_solve_time"] += time.time() - st

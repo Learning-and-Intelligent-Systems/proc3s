@@ -691,7 +691,7 @@ class RavenYCBEnv(Environment):
         real_env: RavenYCBEnv, belief: RavenBelief, task: Task, render: bool = False
     ) -> RavenYCBEnv:
         twin_state = copy.deepcopy(belief)
-        twin_env = RavenYCBEnv(task=task, teleport=True, render=False, is_twin=True)
+        twin_env = RavenYCBEnv(task=task, teleport=True, render=render, is_twin=True)
         for obj_name, object in twin_state.objects.items():
             obj_id = create_object(
                 object.category, object.color, client=twin_env.client
