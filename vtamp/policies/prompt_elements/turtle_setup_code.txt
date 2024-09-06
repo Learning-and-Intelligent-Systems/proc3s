@@ -1,0 +1,41 @@
+COLORS = ["blue", "green", "pink", "purple"]
+
+@dataclass
+class Obstacle:
+    name: str
+    x_pos: float
+    y_pos: float
+    radius: float
+    color: str
+
+@dataclass
+class DrawnLine:
+    p1_x: float
+    p1_y: float
+    p2_x: float
+    p2_y: float
+    
+@dataclass
+class TurtleState:
+    obstacles:List[Obstacle] = field(default_factory=list)
+    drawn_lines:List[DrawnLine] = field(default_factory=list)
+
+@dataclass
+class ContinuousSampler:
+    min: float = 0
+    max: float = 1
+
+    def sample(self):
+        return random.uniform(self.min, self.max)
+
+@dataclass
+class DiscreteSampler:
+    values: List[int]
+
+    def sample(self):
+        return random.choice(self.values)
+
+@dataclass
+class Action:
+    name: str
+    params: List[float]

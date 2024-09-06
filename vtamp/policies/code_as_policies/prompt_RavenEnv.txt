@@ -1,0 +1,58 @@
+#define system
+{{{system_prompt}}}
+
+{{{raven_setup_code}}}
+
+{{{skill_preface}}}
+
+{{{raven_skills}}}
+
+{{{cap_role}}}
+
+#define user
+State: RavenBelief({"object_0": RavenObject(category="block", color="blue", pos=[0.04, -0.36, 0.02]), "object_1": RavenObject(category="block", color="green", pos=[0.04, -0.36, 0.06]), "object_2": RavenObject(category="block", color="yellow", pos=[0.02, -0.53, 0.02]), "object_3": RavenObject(category="bowl", color="green", pos=[0.17, -0.67, 0.03]), "object_4": RavenObject(category="block", color="red", pos=[-0.15, -0.57, 0.02])})
+Goal: Place any block next to any other block
+
+#define assistant
+```python
+def gen_plan(initial:RavenBelief):
+    plan = []
+    block1 = initial.objects["object_1"]
+    block3 = initial.objects["object_3"]
+    plan.append(Action("pick", block1.pose.point))
+    x, y, z = block3.pose.point
+    plan.append(Action("place", [x, y+0.04, z]))
+    return plan
+```
+
+#define user
+State: RavenBelief({"object_0": RavenObject(category="block", color="blue", pos=[0.04, -0.36, 0.02]), "object_1": RavenObject(category="block", color="green", pos=[0.04, -0.36, 0.06]), "object_2": RavenObject(category="block", color="yellow", pos=[0.02, -0.53, 0.02]), "object_3": RavenObject(category="bowl", color="green", pos=[0.17, -0.67, 0.03]), "object_4": RavenObject(category="block", color="red", pos=[-0.15, -0.57, 0.02])})
+Goal: Place any 3 blocks in a 30cm horizontal line in the middle of the table.
+
+#define assistant
+```python
+def gen_plan(initial:RavenBelief):
+    def get_line_center_given_endpoints(start_x, start_y, end_x, end_y):
+        return ((start_x + end_x) / 2, (start_y + end_y) / 2)
+    
+    plan = []
+    block1 = initial.objects["object_1"]
+    block2 = initial.objects["object_2"]
+    block2 = initial.objects["object_3"]
+
+    table_middle_y = (-0.8 + -0.2) / 2
+    line_start_x = -0.15
+    line_end_x = 0.15
+    middle_x, middle_y = get_line_center_given_endpoints(line_start_x, table_middle_y, line_end_x, table_middle_y)
+
+    plan.append(Action("pick", block1.pose.point))
+    plan.append(Action("place", [line_start_x, table_middle_y, block1.pose.point[2]]))
+
+    plan.append(Action("pick", block2.pose.point))
+    plan.append(Action("place", [middle_x, middle_y, block2.pose.point[2]]))
+
+    plan.append(Action("pick", block3.pose.point))
+    plan.append(Action("place", [line_end_x, table_middle_y, block3.pose.point[2]]))
+
+    return plan
+```

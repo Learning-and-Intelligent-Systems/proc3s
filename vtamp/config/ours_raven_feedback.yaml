@@ -1,0 +1,19 @@
+defaults:
+  - override hydra/job_logging: colorlog
+  - override hydra/hydra_logging: colorlog
+
+name: ours_raven
+render: true
+vis_debug: false
+seed: 0
+max_env_steps: 10
+env:
+  _target_: vtamp.environments.raven.env.RavenEnv
+task:
+  _target_: vtamp.environments.raven.tasks.UnstackTask
+policy:
+  _target_: vtamp.policies.ours.policy.Ours
+  max_feedbacks: 2
+  max_csp_samples: 100
+updater:
+  _target_: vtamp.environments.raven.env.RavenGroundTruthBeliefUpdater

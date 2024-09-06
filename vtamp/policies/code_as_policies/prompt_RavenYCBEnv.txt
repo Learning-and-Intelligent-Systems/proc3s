@@ -1,0 +1,27 @@
+#define system
+{{{system_prompt}}}
+
+{{{raven_ycb_setup_code}}}
+
+{{{skill_preface}}}
+
+{{{raven_ycb_skills}}}
+
+{{{cap_role}}}
+
+#define user
+State: RavenBelief({"object_0": RavenObject(category="banana", color="yellow", pose=[0.04, -0.66, 0.02, 0.0, 0.0, -2.57]), "object_1": RavenObject(category="potted_meat_can", color="blue", pose=[0.22, -0.7, 0.04, -0.0, 0.0, -1.3]), "object_2": RavenObject(category="apple", color="red", pose=[-0.2, -0.56, 0.04, -0.0, -0.0, 0.88]), "object_3": RavenObject(category="pear", color="green", pose=[0.17, -0.59, 0.03, 0.0, -0.0, 1.49]), "object_4": RavenObject(category="power_drill", color="orange", pose=[0.02, -0.42, 0.03, -0.0, 0.0, -2.44]), "object_5": RavenObject(category="strawberry", color="red", pose=[0.19, -0.51, 0.02, -0.0, -0.0, 3.13])})
+Goal: Move any object somewhere else
+
+#define assistant
+```python
+def gen_plan(initial:RavenBelief):
+    plan = []
+    x_place = ContinuousSampler(TABLE_BOUNDS[0][0], TABLE_BOUNDS[0][1]).sample()
+    y_place = ContinuousSampler(TABLE_BOUNDS[1][0], TABLE_BOUNDS[1][1]).sample()
+    grasp = GraspSampler().sample()
+    object_name = list(initial.objects.keys())[0] # "object_0"
+    plan.append(Action("pick", [object_name, grasp]))
+    plan.append(Action("place", [object_name, grasp, RavenPose(x=x_place, y=y_place, z=0.02)]))
+    return plan
+```

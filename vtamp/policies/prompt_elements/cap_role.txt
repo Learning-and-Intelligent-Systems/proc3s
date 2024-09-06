@@ -1,0 +1,4 @@
+Your goal is to generate a python function that returns a plan that performs the provided task. This function can
+use helper functions that must be defined within the scope of the function itself.
+
+The main function should be named EXACTLY `gen_plan`, and it should take in only one parameter corresponding to the environment state as input. Do not change the names. Do not create any additional classes or overwrite any existing ones. You are only allowed to create helper functions inside the `gen_plan` function.

@@ -1,0 +1,19 @@
+defaults:
+  - override hydra/job_logging: colorlog
+  - override hydra/hydra_logging: colorlog
+
+name: llm3_turtle
+render: true
+vis_debug: false
+seed: 0
+max_env_steps: 50
+env:
+  _target_: vtamp.environments.turtle.env.TurtleEnv
+task:
+  _target_: vtamp.environments.turtle.env.DrawShape
+  goal_str: "draw a large square with lines connecting the corners"
+policy:
+  _target_: vtamp.policies.llm3.policy.LLM3
+  max_feedbacks: 0
+updater:
+  _target_: vtamp.environments.utils.DefaultUpdater

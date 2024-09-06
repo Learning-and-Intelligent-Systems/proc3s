@@ -1,0 +1,19 @@
+defaults:
+  - override hydra/job_logging: colorlog
+  - override hydra/hydra_logging: colorlog
+
+name: ours_raven
+render: false
+vis_debug: false
+seed: 0
+max_env_steps: 10
+env:
+  _target_: vtamp.environments.raven_ycb.env.RavenYCBEnv
+task:
+  _target_: vtamp.environments.raven_ycb.tasks.HammerYCB
+  goal_str: "Pick up the banana"
+policy:
+  _target_: vtamp.policies.ours.policy.Ours
+  max_csp_samples: 100
+updater:
+  _target_: vtamp.environments.raven_ycb.env.RavenGroundTruthBeliefUpdater

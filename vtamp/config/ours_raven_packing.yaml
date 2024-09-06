@@ -1,0 +1,18 @@
+defaults:
+  - override hydra/job_logging: colorlog
+  - override hydra/hydra_logging: colorlog
+
+name: ours_raven_packing
+render: true
+vis_debug: false
+seed: 0
+max_env_steps: 10
+env:
+  _target_: vtamp.environments.raven.env.RavenEnv
+task:
+  _target_: vtamp.environments.raven.tasks.PackingTask
+  goal_str: "Place all blocks within 0.06 of the center of the table"
+policy:
+  _target_: vtamp.policies.ours.policy.Ours
+updater:
+  _target_: vtamp.environments.raven.env.RavenGroundTruthBeliefUpdater

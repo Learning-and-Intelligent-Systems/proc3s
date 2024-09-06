@@ -1,0 +1,5 @@
+Action("pick", [x, y, z])
+Move the gripper to location x, y, z and close the gripper.
+
+Action("place", [x, y, z])
+Move the gripper to location x, y, z and open the gripper.

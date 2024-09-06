@@ -1,0 +1,35 @@
+#define system
+{{{system_prompt}}}
+
+{{{raven_setup_code}}}
+
+{{{skill_preface}}}
+
+{{{raven_skills}}}
+
+{{{llm3_role}}}
+
+#define user
+State: RavenBelief({"object_0": RavenObject(category="block", color="blue", pos=[0.04, -0.36, 0.02]), "object_1": RavenObject(category="block", color="green", pos=[0.04, -0.36, 0.06]), "object_2": RavenObject(category="block", color="yellow", pos=[0.02, -0.53, 0.02]), "object_3": RavenObject(category="bowl", color="green", pos=[0.17, -0.67, 0.03]), "object_4": RavenObject(category="block", color="red", pos=[-0.15, -0.57, 0.02])})
+Goal: Place any block next to any other block
+
+#define assistant
+```python
+gen_plan = [
+    Action("pick", [0.04, -0.36, 0.02]),
+    Action("place", [0.17, -0.67, 0.03])
+]
+```
+
+#define user
+Error on step 0, collision with object_1
+
+#define assistant
+```python
+gen_plan = [
+    Action("pick",  [0.04, -0.36, 0.06]),
+    Action("place", [0.04, 0.36, 0.02]),
+    Action("pick",  [0.04, -0.36, 0.02]),
+    Action("place", [0.17, -0.67, 0.03])
+]
+```

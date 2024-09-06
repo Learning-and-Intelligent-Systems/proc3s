@@ -1,0 +1,5 @@
+Action("pick", [o, g])
+Pick up object o at grasp g sampled from a grasp sampler. Grasps MUST come from grasp samplers.
+
+Action("place", [o, g, p])
+If holding an object o at grasp g, place the object at pose p.

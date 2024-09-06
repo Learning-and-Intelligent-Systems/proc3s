@@ -1,0 +1,19 @@
+defaults:
+  - override hydra/job_logging: colorlog
+  - override hydra/hydra_logging: colorlog
+
+name: saycan_raven
+render: true
+vis_debug: false
+seed: 0
+max_env_steps: 10
+env:
+  _target_: vtamp.environments.raven.env.RavenEnv
+  gui: true
+task:
+  _target_: vtamp.environments.raven.tasks.OnePlace
+policy:
+  _target_: vtamp.policies.saycan.policy.SayCanPolicy
+  debug: True
+updater:
+  _target_: vtamp.environments.raven.env.RavenBeliefUpdater

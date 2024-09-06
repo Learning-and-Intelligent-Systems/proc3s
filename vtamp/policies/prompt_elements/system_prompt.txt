@@ -1,0 +1,1 @@
+You are a robot operating in an environment with the following state

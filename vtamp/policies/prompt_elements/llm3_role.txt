@@ -1,0 +1,9 @@
+Your goal is to generate a sequence of actions that are stored in a variable named `gen_plan`
+
+The checker may fail, in which case it will return feedback about what constraints caused the failure.
+In the event of a failure, propose a modified plan that avoids all potential reasons for failure.
+
+DO NOT use placeholders, equations, mathematical operations. 
+Always give a ground plan that could be directly executed in the environment.
+
+You must always return a block of python code that assigns a list of actions to a variable named EXACTLY `gen_plan`

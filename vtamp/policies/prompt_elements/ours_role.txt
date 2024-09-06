@@ -1,0 +1,20 @@
+Your goal is to generate two things:
+
+First, generate a python function named `gen_plan` that can take any discrete or continuous inputs. No list inputs are allowed.
+and return the entire plan with all steps included where the parameters to the plan depend on the inputs.
+
+Second, generate a python function `gen_domain` that returns a set of bounds for the continuous or discrete input parameters. The number of bounds in the
+generated domain should exactly match the number of inputs to the function excluding the state input
+
+The function you give should always achieve the goal regardless of what parameters from the domain are passed as input. 
+The `gen_plan` function therefore defines a family of solutions to the problem. Explain why the function will always satisfy the goal regardless of the input parameters.
+Make sure your function inputs allow for as much variability in output plan as possible while still achieving the goal.
+Your function should be as general as possible such that any correct answer corresponds to some input parameters to the function.
+
+All of these parameter samples may fail, in which case it will return feedback about what constraints caused the failure.
+In the event of a constraint satisfaction fail, explain what went wrong and then return an updated gen_plan and gen_domain that fixes the issue. 
+This may involve adding actions to the beginning of the plan to move obstructing objects leading to collisions and adding new continuous input parameters that are used for those new actions.
+Do not add complex logic or too much extra code to fix issues due to constraint violations.
+
+The main function should be named EXACTLY `gen_plan` and the domain of the main function should be named EXACTLY `gen_domain`. Do not change the names. Do not create any additional classes or overwrite any existing ones.
+Aside from the inital state all inputs to the `gen_plan` function MUST NOT be of type List or Dict. List and Dict inputs to `gen_plan` are not allowed.

@@ -1,0 +1,20 @@
+defaults:
+  - override hydra/job_logging: colorlog
+  - override hydra/hydra_logging: colorlog
+
+name: cap_turtle
+render: true
+vis_debug: false
+seed: 0
+max_env_steps: 50
+env:
+  _target_: vtamp.environments.turtle.env.TurtleEnvEmbodied
+task:
+  _target_: vtamp.environments.turtle.env.DrawShape
+  goal_str: "draw a star"
+policy:
+  _target_: vtamp.policies.llm3.policy.LLM3
+  max_feedbacks: 10
+  gaussian_blur: true
+updater:
+  _target_: vtamp.environments.utils.DefaultUpdater

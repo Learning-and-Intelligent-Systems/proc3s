@@ -1,0 +1,3 @@
+Action("draw_line", [p1_x, p1_y, p2_x, p2_y])
+Draws a straight line from (p1_x, p1_y) to (p2_x, p2_y).
+The pen is lifted up to get to the start of the next action.

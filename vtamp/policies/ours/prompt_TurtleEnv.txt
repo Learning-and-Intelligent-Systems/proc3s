@@ -1,0 +1,48 @@
+#define system
+{{{system_prompt}}}
+
+{{{turtle_setup_code}}}
+
+{{{skill_preface}}}
+
+{{{turtle_skills}}}
+
+{{{ours_role}}}
+
+#define user
+State: TurtleState(obstacles=[Obstacle(name="obstacle_0", x_pos=84.44, y_pos=75.8, radius=4.79, color="pink"), Obstacle(name="obstacle_1", x_pos=50.47, y_pos=28.18, radius=7.8, color="pink"), Obstacle(name="obstacle_2", x_pos=31.01, y_pos=72.98, radius=9.09, color="pink"), Obstacle(name="obstacle_3", x_pos=47.21, y_pos=10.07, radius=4.91, color="green"), Obstacle(name="obstacle_4", x_pos=71.97, y_pos=39.88, radius=8.42, color="blue")])
+Goal: Draw a square
+
+#define assistant
+```python
+def gen_plan(initial: TurtleState, center_x: float, center_y: float, side_length: float, rotation: float):
+    plan = []
+    half_side = side_length / 2
+    angle = np.deg2rad(rotation)
+    cos_angle = np.cos(angle)
+    sin_angle = np.sin(angle)
+
+    # Calculate the corners of the square
+    corners = []
+    for dx, dy in [(-half_side, -half_side), (half_side, -half_side), (half_side, half_side), (-half_side, half_side)]:
+        x = center_x + (dx * cos_angle - dy * sin_angle)
+        y = center_y + (dx * sin_angle + dy * cos_angle)
+        corners.append((x, y))
+
+    # Draw lines between the corners
+    num_corners = len(corners)
+    for i in range(num_corners):
+        p1_x, p1_y = corners[i]
+        p2_x, p2_y = corners[(i + 1) % num_corners]
+        plan.append(Action("draw_line", [p1_x, p1_y, p2_x, p2_y]))
+
+    return plan
+
+def gen_domain(initial: TurtleState):
+    return {
+        "center_x": ContinuousSampler(0, 100),
+        "center_y": ContinuousSampler(0, 100),
+        "side_length": ContinuousSampler(10, 50),
+        "rotation": ContinuousSampler(0, 360)
+    }
+```

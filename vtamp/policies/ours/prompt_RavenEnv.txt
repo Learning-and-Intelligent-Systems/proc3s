@@ -1,0 +1,62 @@
+#define system
+{{{system_prompt}}}
+
+{{{raven_setup_code}}}
+
+{{{skill_preface}}}
+
+{{{raven_skills}}}
+
+{{{ours_role}}}
+
+#define user
+Goal: Place a green block next to another green block
+initial = RavenBelief({"object_0": RavenObject(category="block", color="yellow", pose=[0.04, -0.36, 0.02, 0.0, -0.0, -0.0]), "object_1": RavenObject(category="block", color="green", pose=[0.05, -0.55, 0.02, 0.0, -0.0, -0.0]), "object_2": RavenObject(category="block", color="blue", pose=[-0.08, -0.68, 0.02, 0.0, -0.0, -0.0]), "object_3": RavenObject(category="bowl", color="green", pose=[-0.14, -0.35, 0.03, 0.0, -0.0, 0.0])})
+
+#define assistant
+```python
+def gen_plan(initial:RavenBelief, x_offset:float, y_offset:float):
+    plan = []
+    block1 = initial.objects["object_1"]
+    block3 = initial.objects["object_3"]
+    plan.append(Action("pick", block1.pose.point))
+    x, y, z = block3.pose.point
+    plan.append(Action("place", [x+x_offset, y+y_offset, z]))
+    return plan
+
+def gen_domain(initial:RavenBelief):
+    return {
+        "x_offset": ContinuousSampler(-0.1, 0.1),
+        "y_offset": ContinuousSampler(-0.1, 0.1),
+    }
+```
+
+#define user
+50 occurences: Step 0, Action pick, Violation: [Twin] Collision detected between object_2 object gripper finger
+
+#define assistant
+```python
+def gen_plan(initial:RavenBelief, x_offset:float, y_offset:float, x_place:float, y_place:float):
+    plan = []
+
+    # Resolving the collision with object_2 by moving object_2 out of the way
+    block2 = initial.objects["object_2"]
+    plan.append(Action("pick", block2.pose.point))
+    plan.append(Action("place", [x_place, y_place, TABLE_BOUNDS[2][1]]))
+
+    # Original plan code
+    block1 = initial.objects["object_1"]
+    block3 = initial.objects["object_3"]
+    plan.append(Action("pick", block1.pose.point))
+    x, y, z = block3.pose.point
+    plan.append(Action("place", [x+x_offset, y+y_offset, z]))
+    return plan
+
+def gen_domain(initial:RavenBelief):
+    return {
+        "x_offset": ContinuousSampler(-0.1, 0.1),
+        "y_offset": ContinuousSampler(-0.1, 0.1),
+        "x_place": ContinuousSampler(TABLE_BOUNDS[0][0], TABLE_BOUNDS[0][1]),
+        "y_place": ContinuousSampler(TABLE_BOUNDS[1][0], TABLE_BOUNDS[1][1]),
+    }
+```

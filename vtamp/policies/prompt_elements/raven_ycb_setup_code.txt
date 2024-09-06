@@ -1,0 +1,58 @@
+CATEGORIES = ["bowl", "block"]
+TABLE_BOUNDS = [[-0.3, 0.3], [-0.8, -0.2], [0, 0]]  # X Y Z
+TABLE_CENTER = [0, -0.5, 0]
+BLOCK_SIZE = 0.04
+
+@dataclass
+class RavenPose:
+    x: float = 0
+    y: float = 0
+    z: float = 0
+    roll: float = 0
+    pitch: float = 0
+    yaw: float = 0
+
+    @property
+    def point(self):
+        ...
+    
+    @property
+    def euler(self):
+        ...
+
+@dataclass
+class RavenObject:
+    category: str
+    color: str
+    pose: RavenPose = field(default_factory=lambda: RavenPose())
+    body: Optional[int] = None
+
+@dataclass
+class RavenBelief:
+    objects: Dict[str, RavenObject] = field(default_factory=dict)
+    observations: List[Any] = field(default_factory=list)
+
+@dataclass
+class ContinuousSampler:
+    min: float = 0
+    max: float = 1
+
+    def sample(self):
+        return random.uniform(self.min, self.max)
+
+@dataclass
+class DiscreteSampler:
+    values: List[int]
+
+    def sample(self):
+        return random.choice(self.values)
+
+@dataclass
+class Action:
+    name: str
+    params: List[float]
+
+@dataclass
+class GraspSampler(Sampler):
+    def sample(self) -> RavenGrasp:
+        ...
