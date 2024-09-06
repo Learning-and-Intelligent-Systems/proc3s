@@ -8,18 +8,15 @@ import time
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 
-import clip
 import imageio
 import numpy as np
 import pybullet as p
 import pybullet_data
 import pybullet_utils.bullet_client as bc
 import tensorflow.compat.v1 as tf  # type: ignore
-import torch
 
 import vtamp.environments.pb_utils as pbu
 from vtamp.environments.utils import Action, Environment, Task, Updater
-from vtamp.perception.vild import vild
 from vtamp.utils import get_log_dir
 
 log = logging.getLogger(__name__)
@@ -199,55 +196,6 @@ ROOT_PATH = os.path.abspath(os.path.join(__file__, *[os.pardir] * 3))
 class RavenGroundTruthBeliefUpdater(Updater):
     def update(self, obs) -> RavenBelief:
         return obs["internal_state"]
-
-
-class RavenVisionBeliefUpdater(Updater):
-    def __init__(self):
-        self.last_belief = None
-        self.clip_model, self.clip_preprocess = clip.load("ViT-B/32")
-        if torch.cuda.is_available():
-            self.clip_model.cuda().eval()
-        else:
-            self.clip_model.eval()
-
-        self.gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=0.2)
-        self.session = tf.Session(
-            graph=tf.Graph(), config=tf.ConfigProto(gpu_options=self.gpu_options)
-        )
-        _ = tf.saved_model.loader.load(self.session, ["serve"], VILD_CHECKPOINT_PATH)
-
-    def update(self, obs) -> RavenBelief:
-        if self.last_belief is None:
-            top_down_path = os.path.join(get_log_dir(), "tmp.png")
-            color, depth, position, orientation, intrinsics = obs["image_side"]
-            imageio.imsave(top_down_path, color)
-
-            found_objects, segmentations = vild(
-                top_down_path, self.clip_model, self.session, plot_on=False
-            )
-
-            points = get_pointcloud(depth, intrinsics)
-            position = np.float32(position).reshape(3, 1)
-            rotation = p.getMatrixFromQuaternion(orientation)
-            rotation = np.float32(rotation).reshape(3, 3)
-            transform = np.eye(4)
-            transform[:3, :] = np.hstack((rotation, position))
-            pointcloud = transform_pointcloud(points, transform)
-
-            self.last_belief = RavenBelief(observations=[obs])
-            for i, found_object in enumerate(found_objects):
-                color, category = found_object.split(" ")
-                segmentation = segmentations[i, ...]
-                seg_xs, seg_ys = np.where(segmentation > 0)
-                mean_xyz = np.mean(pointcloud[seg_xs, seg_ys, :], axis=0)
-                object = RavenObject(
-                    category=category, color=color, pos=mean_xyz.tolist()
-                )
-                self.last_belief.objects[f"object_{i}"] = object
-
-        new_belief = copy.deepcopy(self.last_belief)
-        new_belief.observations.append(obs)
-        return new_belief
 
 
 class Robotiq2F85:

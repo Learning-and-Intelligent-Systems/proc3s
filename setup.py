@@ -29,7 +29,6 @@ setup(
         "tensorflow==2.16.1",
         "orbax-checkpoint==0.5.3",
         "optax==0.2.1",
-        "torch==2.2.1",
         "shapely==2.0.3",
         "clip @ git+https://github.com/openai/CLIP.git#egg=clip",
         "hydra_colorlog==1.2.0",
