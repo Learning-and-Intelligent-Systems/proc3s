@@ -23,7 +23,7 @@ Here are a few example commands to give you an idea:
 
 ```
 # Our approach on a task with goal "draw a rectangle that encloses two obstacles".
-python eval_policy.py --config-dir . --config_name=ours_turtle_embodied.yaml ++render=True
+python eval_policy.py --config-dir . --config-name=ours_turtle_embodied.yaml ++render=True
 
 # Code as Policies on a RAVENS task with goal "Put three blocks in a line flat on the table"
 python eval_policy.py --config-dir=. --config-name=cap_raven.yaml ++render=True
