@@ -1960,8 +1960,8 @@ def get_aabb_vertices(aabb: AABB):
     ]
 
 
-def wait_if_gui(*args, **kwargs):
-    if has_gui(**kwargs):
+def wait_if_gui(debug=False, *args, **kwargs):
+    if has_gui(**kwargs) and debug:
         wait_for_user(*args, **kwargs)
 
 

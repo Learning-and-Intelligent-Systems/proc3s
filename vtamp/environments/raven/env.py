@@ -442,9 +442,10 @@ class RavenEnv(Environment):
         super().__init__(task)
         self.teleport = teleport
         self.stability_check = stability_check
-
+        self.is_twin = False
         if is_twin:
             self.log_prefix = "[Twin]"
+            self.is_twin = True
         else:
             self.log_prefix = "[Main]"
 
@@ -468,6 +469,7 @@ class RavenEnv(Environment):
                 p.STATE_LOGGING_VIDEO_MP4,
                 os.path.join(get_log_dir(), f"replay.mp4"),
             )
+        self.debug_render = render
 
     def close(self):
         if self.record_video:
@@ -522,7 +524,7 @@ class RavenEnv(Environment):
                 int(obj.body), obj.pose.point, obj.pose.quat
             )
 
-        # pbu.wait_if_gui(client=self.client)
+        pbu.wait_if_gui(debug=self.is_twin and self.debug_render, client=self.client)
         return self.get_observation()
 
     def apply_attachments(self):
@@ -645,13 +647,14 @@ class RavenEnv(Environment):
             log.info(f"{self.log_prefix} Moving to hover")
             ik_success &= self.move(hover_pose)
             collisions += self.get_env_collisions()
+            pbu.wait_if_gui(debug=self.is_twin and self.debug_render, client=self.client, )
 
             # Move to pick
             log.info(f"{self.log_prefix} Moving to grasp")
             ik_success &= self.move(pick_pose)
             collisions += self.get_env_collisions()
 
-            # pbu.wait_if_gui(client=self.client)
+            pbu.wait_if_gui(debug=self.is_twin and self.debug_render, client=self.client)
             # Close the gripper
             log.info(f"{self.log_prefix} Closing gripper")
             if not self.teleport:
@@ -666,9 +669,11 @@ class RavenEnv(Environment):
                 )
 
             # Back to prepick
+            pbu.wait_if_gui(debug=self.is_twin and self.debug_render, client=self.client)
             log.info(f"{self.log_prefix} Moving back to hover")
             ik_success &= self.move(hover_pose)
             collisions += self.get_env_collisions()
+            pbu.wait_if_gui(debug=self.is_twin and self.debug_render, client=self.client)
 
         elif action.name == "place":
             if self.teleport and len(self.attachments) == 0:
@@ -715,9 +720,9 @@ class RavenEnv(Environment):
                     RavenPose.from_pbu(pose_after_place)
                 )
                 log.info("pose_diff: " + str(pose_diff))
-                pbu.wait_if_gui(client=self.client)
+                pbu.wait_if_gui(debug=self.is_twin and self.debug_render, client=self.client)
                 if self.teleport and pose_diff > 0.04 and self.stability_check:
-                    pbu.wait_if_gui(client=self.client)
+                    pbu.wait_if_gui(debug=self.is_twin and self.debug_render, client=self.client)
                     return (
                         None,
                         0,
@@ -738,6 +743,7 @@ class RavenEnv(Environment):
             # back to preplace
             log.info(f"{self.log_prefix} Move up a little after placing")
             ik_success &= self.move(hover_pose)
+            pbu.wait_if_gui(debug=self.is_twin and self.debug_render, client=self.client)
 
         log.info(f"{self.log_prefix} Getting observation")
 
@@ -753,11 +759,12 @@ class RavenEnv(Environment):
         info = {"constraint_violations": collisions}
 
         if not ik_success:
+            pbu.wait_if_gui(debug=self.is_twin and self.debug_render, client=self.client)
             info["constraint_violations"].append("IK Failure")
 
         self.client.stepSimulation()
         # log.info(info["constraint_violations"])
-        # pbu.wait_if_gui(client=self.client)
+        pbu.wait_if_gui(debug=self.is_twin and self.debug_render, client=self.client)
 
         return observation, reward, done, info
 
