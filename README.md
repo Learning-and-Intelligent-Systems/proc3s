@@ -5,8 +5,8 @@ Please reach out to Aidan Curtis (curtisa@csail.mit.edu) and Nishanth Kumar (njk
 
 ## Setup
 ```
-conda create -n "vtamp" python=3.10
-conda activate vtamp
+conda create -n "proc3s" python=3.10
+conda activate proc3s
 python -m pip install -e .
 ```
 
