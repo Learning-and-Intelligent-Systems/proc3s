@@ -40,5 +40,5 @@ python eval_policy.py --config-dir=. --config-name=ours_raven.yaml +policy.use_c
 
 Finally, to visualize constraint checking, use the `vis_debug=true` flag. e.g.:
 ```
-python eval_policy.py --config-dir=. --config-name=ours_raven.yaml vis_debug=true
+python eval_policy.py --config-dir=. --config-name=ours_raven.yaml vis_debug=true ++render=True
 ```
