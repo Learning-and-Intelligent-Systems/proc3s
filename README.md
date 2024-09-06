@@ -23,13 +23,13 @@ Here are a few example commands to give you an idea:
 
 ```
 # Our approach on a task with goal "draw a rectangle that encloses two obstacles".
-python eval_policy.py --config-dir . --config_name=ours_turtle_embodied.yaml
+python eval_policy.py --config-dir . --config_name=ours_turtle_embodied.yaml ++render=True
 
 # Code as Policies on a RAVENS task with goal "Put three blocks in a line flat on the table"
-python eval_policy.py --config-dir=. --config-name=cap_raven.yaml
+python eval_policy.py --config-dir=. --config-name=cap_raven.yaml ++render=True
 
 # LLM^3 on a RAVENS task with goal "Put three blocks in a line flat on the table"
-python eval_policy.py --config-dir=. --config-name=llm3_raven.yaml
+python eval_policy.py --config-dir=. --config-name=llm3_raven.yaml ++render=True
 ```
 
 To turn on caching for llm responses, use the `+policy.use_cache=true` flag. e.g.:
