@@ -11,7 +11,7 @@ env:
   _target_: vtamp.environments.raven.env.RavenEnv
 task:
   _target_: vtamp.environments.raven.tasks.CustomTask
-  goal_str: "place the blocks as close to you as possible"
+  goal_str: "place all the blocks in the bowl"
 policy:
   _target_: vtamp.policies.ours.policy.Ours
   max_csp_samples: 10

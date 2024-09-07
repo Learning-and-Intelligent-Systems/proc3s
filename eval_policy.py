@@ -120,6 +120,7 @@ def main(cfg: OmegaConf):
         log.info("Done: " + str(done))
         log.info("Info: " + str(info))
 
+    twin_env.close()
     env.close()
     log.info("Statistics: " + str(json.dumps(statistics)))
 
