@@ -702,48 +702,49 @@ class RavenEnv(Environment):
             ik_success &= self.move(place_pose)
             collisions += self.get_env_collisions()
 
-            if self.teleport:
-                pose_before_place = pbu.get_pose(
-                    self.attachments[0].child, client=self.client
-                )
-                # Open gripper
-                self.gripper.release()
-
-                # Simulate the object falling
-                for _ in range(500):
-                    self.step_sim_and_render(teleport=False)
-
-                pose_after_place = pbu.get_pose(
-                    self.attachments[0].child, client=self.client
-                )
-                pose_diff = RavenPose.from_pbu(pose_before_place).dist(
-                    RavenPose.from_pbu(pose_after_place)
-                )
-                log.info("pose_diff: " + str(pose_diff))
-                pbu.wait_if_gui(debug=self.is_twin and self.debug_render, client=self.client)
-                if self.teleport and pose_diff > 0.04 and self.stability_check:
-                    pbu.wait_if_gui(debug=self.is_twin and self.debug_render, client=self.client)
-                    return (
-                        None,
-                        0,
-                        False,
-                        {"constraint_violations": ["Unstable placement"]},
+            if len(collisions) == 0:
+                if self.teleport:
+                    pose_before_place = pbu.get_pose(
+                        self.attachments[0].child, client=self.client
                     )
+                    # Open gripper
+                    self.gripper.release()
 
-                # Release kinematic attachments
-                self.attachments = []
-            else:
-                # Open gripper
-                self.gripper.release()
+                    # Simulate the object falling
+                    for _ in range(500):
+                        self.step_sim_and_render(teleport=False)
 
-                # Simulate the object falling
-                for _ in range(500):
-                    self.step_sim_and_render(teleport=self.teleport)
+                    pose_after_place = pbu.get_pose(
+                        self.attachments[0].child, client=self.client
+                    )
+                    pose_diff = RavenPose.from_pbu(pose_before_place).dist(
+                        RavenPose.from_pbu(pose_after_place)
+                    )
+                    log.info("pose_diff: " + str(pose_diff))
+                    pbu.wait_if_gui(debug=self.is_twin and self.debug_render, client=self.client)
+                    if self.teleport and pose_diff > 0.04 and self.stability_check:
+                        pbu.wait_if_gui(debug=self.is_twin and self.debug_render, client=self.client)
+                        return (
+                            None,
+                            0,
+                            False,
+                            {"constraint_violations": ["Unstable placement"]},
+                        )
 
-            # back to preplace
-            log.info(f"{self.log_prefix} Move up a little after placing")
-            ik_success &= self.move(hover_pose)
-            pbu.wait_if_gui(debug=self.is_twin and self.debug_render, client=self.client)
+                    # Release kinematic attachments
+                    self.attachments = []
+                else:
+                    # Open gripper
+                    self.gripper.release()
+
+                    # Simulate the object falling
+                    for _ in range(500):
+                        self.step_sim_and_render(teleport=self.teleport)
+
+                # back to preplace
+                log.info(f"{self.log_prefix} Move up a little after placing")
+                ik_success &= self.move(hover_pose)
+                pbu.wait_if_gui(debug=self.is_twin and self.debug_render, client=self.client)
 
         log.info(f"{self.log_prefix} Getting observation")
 

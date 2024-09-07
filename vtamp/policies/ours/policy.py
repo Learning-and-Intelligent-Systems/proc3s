@@ -11,6 +11,8 @@ import traceback
 from collections import Counter
 from dataclasses import dataclass
 from typing import Callable, List, Union
+import PIL
+from PIL import Image
 
 import numpy as np
 
@@ -40,6 +42,18 @@ log = logging.getLogger(__name__)
 FUNC_NAME = "gen_plan"
 FUNC_DOMAIN = "gen_domain"
 
+def get_rendering_from_curr_env(
+        env: Environment
+) -> PIL.Image.Image:
+    """Simply grabs a rendering from the current environment."""
+    if "Raven" in env.__str__():
+        return Image.fromarray(env.get_camera_image_side(
+                    image_size=(460 * 2, 640 * 2)
+                )[0])
+
+    else:
+        raise NotImplementedError(f"Need to implement rendering function(s) for env {env}!")
+
 
 def rejection_sample_csp(
     env: Environment,
@@ -47,22 +61,26 @@ def rejection_sample_csp(
     plan_gen: Callable[[List[Union[int, float]]], List[Action]],
     domains_gen: List[Sampler],
     max_attempts: int = 10000,
-) -> Union[List[Action], str]:
+) -> Union[List[Action], str, int, List[PIL.Image.Image]]:
     """A constraint satisfaction strategy that randomly samples input vectors
     until it finds one that satisfies the constraints.
 
     If none are found, it returns the most common mode of failure.
     """
     violation_modes = Counter()
+    img_renderings_from_most_progressed_plan = []
     for i in range(max_attempts):
+        curr_attempt_img_renderings = []
         log.info(f"CSP Sampling iter {i}")
         domains = domains_gen(initial_state)
         input_vec = {name: domain.sample() for name, domain in domains.items()}
         _ = env.reset()
         ground_plan = plan_gen(initial_state, **input_vec)
         constraint_violated = False
+        curr_attempt_img_renderings.append(get_rendering_from_curr_env(env))
         for ai, action in enumerate(ground_plan):
             _, _, _, info = env.step(action)
+            curr_attempt_img_renderings.append(get_rendering_from_curr_env(env))
             if len(info["constraint_violations"]) > 0:
                 violation_str = [
                     "Step {}, Action {}, Violation: {}".format(
@@ -73,11 +91,12 @@ def rejection_sample_csp(
                 violation_modes.update(violation_str)
                 constraint_violated = True
                 log.info(f"Constraint violation " + str(info["constraint_violations"]))
+                if len(img_renderings_from_most_progressed_plan) < len(curr_attempt_img_renderings):
+                    img_renderings_from_most_progressed_plan = curr_attempt_img_renderings[:]
                 break
         if not constraint_violated:
-            return ground_plan, None, i
-
-    return None, violation_modes, i
+            return ground_plan, None, i, curr_attempt_img_renderings        
+    return ground_plan[:i+1], violation_modes, i, img_renderings_from_most_progressed_plan
 
 
 def import_constants_from_class(cls):
@@ -189,7 +208,7 @@ class Ours(Policy):
                 func = globals()[FUNC_NAME]
                 domain = globals()[FUNC_DOMAIN]
                 st = time.time()
-                ground_plan, failure_message, csp_samples = rejection_sample_csp(
+                ground_plan, failure_message, csp_samples, imgs_list = rejection_sample_csp(
                     self.twin,
                     belief,
                     func,
@@ -204,10 +223,18 @@ class Ours(Policy):
                 error_message = traceback.format_exc()
                 log.info("Code error: " + str(error_message))
 
-            if ground_plan is not None and error_message is None:
+            # HACK! For now enable manual oracle input of a failure reason!
+            error_message = ""
+            for img_i, img in enumerate(imgs_list):
+                img.save(f"test_{img_i}.png")
+            failure_string = input("human-provided reason for failure")
+            if len(failure_string) > 0:
+                error_message += failure_string + "\n"
+            # END HACK
+
+            if ground_plan is not None and len(error_message) == 0:
                 return ground_plan, statistics
             else:
-
                 if error_message is not None:
                     failure_response = error_message
                 else:
@@ -217,5 +244,7 @@ class Ours(Policy):
 
                 save_log(f"feedback_output_{iter}.txt", failure_response)
                 chat_history.append({"role": "user", "content": failure_response})
+
+        import ipdb; ipdb.set_trace()
 
         return ground_plan, statistics

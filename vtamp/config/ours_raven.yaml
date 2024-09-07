@@ -11,9 +11,10 @@ env:
   _target_: vtamp.environments.raven.env.RavenEnv
 task:
   _target_: vtamp.environments.raven.tasks.CustomTask
-  goal_str: "Put three blocks in a line flat on the table"
+  goal_str: "place the blocks as close to you as possible"
 policy:
   _target_: vtamp.policies.ours.policy.Ours
-  max_csp_samples: 100
+  max_csp_samples: 10
+  max_feedbacks: 10
 updater:
   _target_: vtamp.environments.raven.env.RavenGroundTruthBeliefUpdater
