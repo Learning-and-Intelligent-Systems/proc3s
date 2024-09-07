@@ -13,6 +13,7 @@ from dataclasses import dataclass
 from typing import Callable, List, Union
 import PIL
 from PIL import Image
+import pickle as pkl
 
 import numpy as np
 
@@ -142,6 +143,10 @@ class Ours(Policy):
 
         self.plan = None
 
+    def save_ground_plan(self, ground_plan) -> None:
+        with open('last_ground_plan.plan', 'wb') as f:
+            pkl.dump(ground_plan, f)
+
     def get_action(self, belief, goal: str):
         statistics = {}
         if self.plan is None:
@@ -151,6 +156,7 @@ class Ours(Policy):
                 return None, statistics
             else:
                 log.info("Found plan: {}".format(ground_plan))
+                self.save_ground_plan(ground_plan)
                 self.plan = ground_plan[1:]
                 return ground_plan[0], statistics
         elif len(self.plan) > 0:
@@ -244,7 +250,4 @@ class Ours(Policy):
 
                 save_log(f"feedback_output_{iter}.txt", failure_response)
                 chat_history.append({"role": "user", "content": failure_response})
-
-        import ipdb; ipdb.set_trace()
-
         return ground_plan, statistics
