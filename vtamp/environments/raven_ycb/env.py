@@ -19,7 +19,6 @@ import tensorflow.compat.v1 as tf  # type: ignore
 
 import vtamp.environments.pb_utils as pbu
 from vtamp.environments.utils import Action, Environment, Task, Updater
-from vtamp.perception.vild import vild
 from vtamp.policies.utils import Sampler
 from vtamp.utils import get_log_dir
 

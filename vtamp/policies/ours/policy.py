@@ -175,6 +175,7 @@ class Ours(Policy):
         statistics["csp_samples"] = 0
         statistics["csp_solve_time"] = 0
         statistics["llm_query_time"] = 0
+        imgs_list = []
         for iter in range(self.max_feedbacks + 1):
             statistics["num_feedbacks"] = iter
             st = time.time()
