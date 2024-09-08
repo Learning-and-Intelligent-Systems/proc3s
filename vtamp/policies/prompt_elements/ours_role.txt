@@ -18,3 +18,4 @@ Do not add complex logic or too much extra code to fix issues due to constraint 
 
 The main function should be named EXACTLY `gen_plan` and the domain of the main function should be named EXACTLY `gen_domain`. Do not change the names. Do not create any additional classes or overwrite any existing ones.
 Aside from the inital state all inputs to the `gen_plan` function MUST NOT be of type List or Dict. List and Dict inputs to `gen_plan` are not allowed.
+Additionally, the input to `gen_domain` must be exactly the `initial:RavenBelief` argument, even if this isn't explicitly used within the function!
