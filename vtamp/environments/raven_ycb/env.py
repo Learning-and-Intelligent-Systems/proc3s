@@ -617,7 +617,6 @@ class RavenYCBEnv(Environment):
 
         self.record_video = record_video
         if self.record_video:
-
             self.video_recorder = self.client.startStateLogging(
                 p.STATE_LOGGING_VIDEO_MP4,
                 os.path.join(get_log_dir(), f"replay.mp4"),
@@ -637,10 +636,10 @@ class RavenYCBEnv(Environment):
 
     @staticmethod
     def sample_twin(
-        real_env: RavenYCBEnv, belief: RavenBelief, task: Task, render: bool = False
+        real_env: RavenYCBEnv, belief: RavenBelief, task: Task, render: bool = False, record_video=True
     ) -> RavenYCBEnv:
         twin_state = copy.deepcopy(belief)
-        twin_env = RavenYCBEnv(task=task, teleport=True, render=render, is_twin=True)
+        twin_env = RavenYCBEnv(task=task, teleport=True, render=render, is_twin=True, record_video=record_video)
         for obj_name, object in twin_state.objects.items():
             obj_id = create_object(
                 object.category, object.color, client=twin_env.client
