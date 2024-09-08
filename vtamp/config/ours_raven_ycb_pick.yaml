@@ -15,5 +15,6 @@ task:
 policy:
   _target_: vtamp.policies.ours.policy.Ours
   max_csp_samples: 100
+  max_feedbacks: 10
 updater:
   _target_: vtamp.environments.raven_ycb.env.RavenGroundTruthBeliefUpdater
