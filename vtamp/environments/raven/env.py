@@ -734,18 +734,20 @@ class RavenEnv(Environment):
 
                     # Release kinematic attachments
                     self.attachments = []
-                else:
-                    # Open gripper
-                    self.gripper.release()
 
-                    # Simulate the object falling
-                    for _ in range(500):
-                        self.step_sim_and_render(teleport=self.teleport)
+            if not self.teleport:
+                # Open gripper
+                self.gripper.release()
+                # Simulate the object falling
+                for _ in range(500):
+                    self.step_sim_and_render(teleport=self.teleport)
+                # Release kinematic attachments
+                    self.attachments = []
 
-                # back to preplace
-                log.info(f"{self.log_prefix} Move up a little after placing")
-                ik_success &= self.move(hover_pose)
-                # pbu.wait_if_gui(debug=self.is_twin and self.debug_render, client=self.client)
+            # back to preplace
+            log.info(f"{self.log_prefix} Move up a little after placing")
+            ik_success &= self.move(hover_pose)
+            # pbu.wait_if_gui(debug=self.is_twin and self.debug_render, client=self.client)
 
         log.info(f"{self.log_prefix} Getting observation")
 
