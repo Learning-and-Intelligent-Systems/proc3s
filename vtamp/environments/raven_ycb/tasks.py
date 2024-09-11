@@ -219,14 +219,34 @@ class StackingYCB(RavenTask):
 
     def get_goal(self):
         return self.goal_str
+    
+
+class BananaSpamStack(RavenTask):
+    def __init__(self, goal_str="", **kwargs):
+        self.goal_str = goal_str
+
+    def setup_env(self, client=None):
+        objects = [
+            ("blue", "potted_meat_can"),
+            ("yellow", "banana"),
+        ]
+
+        object_pose_map = fixed_objects_random_location(objects, client=client)
+        return object_pose_map
+
+    def get_reward(self, env: RavenYCBEnv):
+        return 1
+
+    def get_goal(self):
+        return self.goal_str
 
 
-class HammerYCB(RavenTask):
+class BananaYCB(RavenTask):
     def __init__(self, goal_str="", **kwargs):
         self.goal_str = goal_str
 
     def setup_env(self, **kwargs):
-        objects = [("black", "banana")]
+        objects = [("yellow", "banana")]
         raven_state = fixed_objects_random_location(objects, **kwargs)
         return raven_state
 

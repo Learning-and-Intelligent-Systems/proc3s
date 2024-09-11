@@ -10,8 +10,8 @@ max_env_steps: 10
 env:
   _target_: vtamp.environments.raven_ycb.env.RavenYCBEnv
 task:
-  _target_: vtamp.environments.raven_ycb.tasks.BananaYCB
-  goal_str: "Pick up the banana and move it to the center"
+  _target_: vtamp.environments.raven_ycb.tasks.BananaSpamStack
+  goal_str: "Stack the banana onto the spam can"
 policy:
   _target_: vtamp.policies.ours.policy.Ours
   max_csp_samples: 100

@@ -231,6 +231,26 @@ class UnstackTask(RavenTask):
 
     def get_goal(self):
         return self.goal_str
+    
+
+class StackInBowlTask(RavenTask):
+    def __init__(self, goal_str=None, **kwargs):
+        self.goal_str = goal_str
+
+    def setup_env(self, **kwargs):
+        objects = [
+            ("yellow", "block"),
+            ("green", "block"),
+            ("green", "bowl"),
+        ]
+        bottom_blocks, raven_state = fixed_objects_stack(objects, **kwargs)
+        return raven_state
+
+    def get_reward(self, env: RavenEnv):
+        return 1
+
+    def get_goal(self):
+        return self.goal_str
 
 
 class LineHard(RavenTask):
