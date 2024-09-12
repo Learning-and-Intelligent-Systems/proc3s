@@ -32,11 +32,15 @@ python eval_policy.py --config-dir=. --config-name=cap_draw_star.yaml
 python eval_policy.py --config-dir=. --config-name=llm3_draw_star.yaml
 ```
 
+To reproduce full paper experiments, see the experiments config folder [here](https://github.com/Learning-and-Intelligent-Systems/proc3s/tree/main/vtamp/config/all_paper_experiments)
+
 To turn on caching for llm responses, use the `+policy.use_cache=true` flag. e.g.:
 
 ```
 python eval_policy.py --config-dir=. --config-name=ours_raven.yaml +policy.use_cache=true
 ```
+
+
 
 Finally, to visualize constraint checking, use the `vis_debug=true` flag. e.g.:
 ```
