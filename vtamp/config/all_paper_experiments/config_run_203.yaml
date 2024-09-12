@@ -1,0 +1,21 @@
+name: config_run_203
+render: false
+vis_debug: false
+seed: 4
+max_env_steps: 50
+env:
+  _target_: vtamp.environments.turtle.env.TurtleEnvEmbodied
+  stability_check: False
+  gui: true
+task:
+  _target_: vtamp.environments.turtle.env.DrawShape
+  goal_str: "draw a pentagram star"
+  task_name: Star
+policy:
+  _target_: vtamp.policies.llm3.policy.LLM3
+  max_feedbacks: 5
+  max_csp_samples: 10000
+  gaussian_blur: false
+  method: llm3
+updater:
+  _target_: vtamp.environments.utils.DefaultUpdater

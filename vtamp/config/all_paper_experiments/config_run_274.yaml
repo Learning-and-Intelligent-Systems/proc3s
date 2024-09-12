@@ -1,0 +1,21 @@
+name: config_run_274
+render: false
+vis_debug: false
+seed: 5
+max_env_steps: 20
+env:
+  _target_: vtamp.environments.raven.env.RavenEnv
+  stability_check: False
+  gui: true
+task:
+  _target_: vtamp.environments.raven.tasks.UnstackTask
+  goal_str: "Put the green block in the green bowl"
+  task_name: Unstack
+policy:
+  _target_: vtamp.policies.llm3.policy.LLM3
+  max_feedbacks: 5
+  max_csp_samples: 250
+  gaussian_blur: false
+  method: llm3
+updater:
+  _target_: vtamp.environments.raven.env.RavenGroundTruthBeliefUpdater

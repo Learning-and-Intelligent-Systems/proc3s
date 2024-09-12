@@ -1,0 +1,21 @@
+name: config_run_547
+render: false
+vis_debug: false
+seed: 8
+max_env_steps: 20
+env:
+  _target_: vtamp.environments.raven.env.RavenEnv
+  stability_check: True
+  gui: true
+task:
+  _target_: vtamp.environments.raven.tasks.LineHard
+  goal_str: "Stack a pyramid out of any three blocks"
+  task_name: Pyramid
+policy:
+  _target_: vtamp.policies.code_as_policies.policy.CaP
+  max_feedbacks: 0
+  max_csp_samples: 250
+  gaussian_blur: true
+  method: cap-gaussian
+updater:
+  _target_: vtamp.environments.raven.env.RavenGroundTruthBeliefUpdater

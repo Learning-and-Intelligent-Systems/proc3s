@@ -1,0 +1,21 @@
+name: config_run_111
+render: false
+vis_debug: false
+seed: 2
+max_env_steps: 50
+env:
+  _target_: vtamp.environments.turtle.env.TurtleEnvEmbodied
+  stability_check: False
+  gui: true
+task:
+  _target_: vtamp.environments.turtle.env.DrawShape
+  goal_str: "draw the letter M"
+  task_name: Letters
+policy:
+  _target_: vtamp.policies.code_as_policies.policy.CaP
+  max_feedbacks: 0
+  max_csp_samples: 10000
+  gaussian_blur: false
+  method: cap
+updater:
+  _target_: vtamp.environments.utils.DefaultUpdater

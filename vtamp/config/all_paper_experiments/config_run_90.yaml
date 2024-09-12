@@ -1,0 +1,21 @@
+name: config_run_90
+render: false
+vis_debug: false
+seed: 1
+max_env_steps: 20
+env:
+  _target_: vtamp.environments.raven_ycb.env.RavenYCBEnv
+  stability_check: True
+  gui: true
+task:
+  _target_: vtamp.environments.raven_ycb.tasks.StackingYCB
+  goal_str: "Stack any object on any other object"
+  task_name: YCB-Stacking
+policy:
+  _target_: vtamp.policies.ours.policy.Ours
+  max_feedbacks: 5
+  max_csp_samples: 250
+  gaussian_blur: false
+  method: ours
+updater:
+  _target_: vtamp.environments.raven.env.RavenGroundTruthBeliefUpdater

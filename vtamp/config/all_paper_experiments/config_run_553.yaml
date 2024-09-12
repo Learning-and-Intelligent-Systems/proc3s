@@ -1,0 +1,21 @@
+name: config_run_553
+render: false
+vis_debug: false
+seed: 4
+max_env_steps: 20
+env:
+  _target_: vtamp.environments.raven.env.RavenEnv
+  stability_check: False
+  gui: true
+task:
+  _target_: vtamp.environments.raven.tasks.LineHard
+  goal_str: "Put five blocks in a line flat on the table"
+  task_name: Line
+policy:
+  _target_: vtamp.policies.code_as_policies.policy.CaP
+  max_feedbacks: 0
+  max_csp_samples: 250
+  gaussian_blur: true
+  method: cap-gaussian
+updater:
+  _target_: vtamp.environments.raven.env.RavenGroundTruthBeliefUpdater

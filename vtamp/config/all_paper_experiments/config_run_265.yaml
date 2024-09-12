@@ -1,0 +1,21 @@
+name: config_run_265
+render: false
+vis_debug: false
+seed: 6
+max_env_steps: 20
+env:
+  _target_: vtamp.environments.raven.env.RavenEnv
+  stability_check: False
+  gui: true
+task:
+  _target_: vtamp.environments.raven.tasks.PackingTask
+  goal_str: "Place all of the blocks within a square region with a width and length of 0.16 in the center of the table"
+  task_name: Packing
+policy:
+  _target_: vtamp.policies.llm3.policy.LLM3
+  max_feedbacks: 5
+  max_csp_samples: 1000
+  gaussian_blur: false
+  method: llm3
+updater:
+  _target_: vtamp.environments.raven.env.RavenGroundTruthBeliefUpdater

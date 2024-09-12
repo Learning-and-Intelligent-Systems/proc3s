@@ -233,6 +233,20 @@ class UnstackTask(RavenTask):
         return self.goal_str
 
 
+class Empty(RavenTask):
+    def __init__(self, goal_str: str = "", **kwargs):
+        self.goal_str = goal_str
+
+    def setup_env(self, **kwargs):
+        return RavenState()
+
+    def get_reward(self, env: RavenEnv):
+        return 1
+
+    def get_goal(self):
+        return self.goal_str
+
+
 class LineHard(RavenTask):
     def __init__(self, goal_str: str = "", always_stacked=True, **kwargs):
         self.goal_str = goal_str

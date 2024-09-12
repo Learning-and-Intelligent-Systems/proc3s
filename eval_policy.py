@@ -75,6 +75,7 @@ def main(cfg: OmegaConf):
         np.random.seed(cfg["seed"])
 
     log.info("Setting up environment and policy...")
+    print(cfg)
     task: Task = hydra.utils.instantiate(cfg.task)
     updater: Updater = hydra.utils.instantiate(cfg.updater)
     env: Environment = hydra.utils.instantiate(
