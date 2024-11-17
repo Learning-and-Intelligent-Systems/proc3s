@@ -165,3 +165,4 @@ google-cloud-sdk
 machines*
 outputs*
 *.png
+third_party/

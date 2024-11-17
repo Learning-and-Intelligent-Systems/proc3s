@@ -1,0 +1,24 @@
+defaults:
+  - override hydra/job_logging: colorlog
+  - override hydra/hydra_logging: colorlog
+
+name: ours_raven
+render: true
+vis_debug: false
+seed: 0
+max_env_steps: 10
+env:
+  _target_: vtamp.environments.turtle.env.TurtleEnvEmbodied
+  robot_type: ur5
+  real_robot: false
+  real_camera: false
+  image_observations: true
+task:
+  _target_: vtamp.environments.turtle.env.DrawShape
+  goal_str: "draw a star"
+policy:
+  _target_: vtamp.policies.ours.policy.Ours
+  max_csp_samples: 100
+  max_feedbacks: 5
+updater:
+  _target_: vtamp.environments.raven.env.RavenVisionBeliefUpdater

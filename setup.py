@@ -14,7 +14,7 @@ setup(
         "python-dotenv==1.0.1",
         "imageio==2.34.0",
         "easydict==1.12",
-        "opencv-python==4.9.0.80",
+        "opencv-python>=4.9.0.80",
         "Pillow==9.5.0",
         "jax==0.4.25",
         "jaxlib==0.4.25",
@@ -29,10 +29,13 @@ setup(
         "tensorflow==2.16.1",
         "orbax-checkpoint==0.5.3",
         "optax==0.2.1",
+        "torch==2.2.1",
         "shapely==2.0.3",
         "clip @ git+https://github.com/openai/CLIP.git#egg=clip",
         "hydra_colorlog==1.2.0",
         "pystache==0.6.5",
-        "trimesh==4.4.9"
+        "pyzmq==26.1.0",
+        "trimesh==4.4.4",
+        "segment_anything==1.0"
     ],
 )

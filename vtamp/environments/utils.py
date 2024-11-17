@@ -1,8 +1,56 @@
 from __future__ import annotations
 
+import os
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from typing import List
+
+import vtamp.environments.pb_utils as pbu
+
+MODELS_PATH = os.path.join(os.path.dirname(__file__), "../models/")
+
+
+@dataclass
+class Pose:
+    x: float = 0
+    y: float = 0
+    z: float = 0
+    roll: float = 0
+    pitch: float = 0
+    yaw: float = 0
+
+    def __iter__(self):
+        return iter([self.x, self.y, self.z, self.roll, self.pitch, self.yaw])
+
+    @property
+    def point(self):
+        return pbu.Point(self.x, self.y, self.z)
+
+    @property
+    def euler(self):
+        return pbu.Euler(self.roll, self.pitch, self.yaw)
+
+    @property
+    def quat(self):
+        return pbu.quat_from_euler(self.euler)
+
+    def to_pbu(self):
+        return pbu.Pose(point=self.point, euler=self.euler)
+
+    def set_euler(self, euler):
+        self.roll, self.pitch, self.yaw = euler
+
+    @staticmethod
+    def from_pbu(pose):
+        euler = pbu.euler_from_quat(pose[1])
+        return Pose(*pose[0], *euler)
+
+    def dist(self, pose: Pose, rot_scale: float = 1e-2) -> float:
+        pos_distance, ori_distance = pbu.get_pose_distance(self.to_pbu(), pose.to_pbu())
+        return pos_distance + ori_distance * rot_scale
+
+    def multiply(self, pose: Pose) -> Pose:
+        return Pose.from_pbu(pbu.multiply(self.to_pbu(), pose.to_pbu()))
 
 
 @dataclass
@@ -54,8 +102,9 @@ class DefaultUpdater(Updater):
 
 class Environment(ABC):
     @abstractmethod
-    def __init__(self, task: Task = None, **kwargs):
+    def __init__(self, task: Task = None, robot_type="ur5", **kwargs):
         self.task = task
+        self.robot_type=robot_type
         self.param_scale = 1
 
     @abstractmethod
@@ -63,7 +112,7 @@ class Environment(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def sample_twin(env, obs, task) -> Environment:
+    def sample_twin(env, obs, task, **kwargs) -> Environment:
         raise NotImplementedError
 
     def render(self):

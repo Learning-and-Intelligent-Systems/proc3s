@@ -162,6 +162,20 @@ class RavenTask(Task):
         return fixed_objects_random_location(objects, **kwargs)
 
 
+class EmptyTask(RavenTask):
+    def __init__(self, goal_str: str = "", **kwargs):
+        self.goal_str = goal_str
+
+    def setup_env(self, **kwargs):
+        return RavenState()
+
+    def get_reward(self, env: RavenEnv):
+        return 1
+
+    def get_goal(self):
+        return self.goal_str
+
+
 class OnePlace(RavenTask):
     def __init__(self, **kwargs):
         pass

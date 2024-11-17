@@ -1,0 +1,24 @@
+defaults:
+  - override hydra/job_logging: colorlog
+  - override hydra/hydra_logging: colorlog
+
+name: ours_raven
+render: false
+vis_debug: false
+seed: 0
+max_env_steps: 10
+env:
+  _target_: vtamp.environments.raven.env.RavenEnv
+  robot_type: panda
+  real_robot: true
+  real_camera: true
+  image_observations: true
+task:
+  _target_: vtamp.environments.raven.tasks.Empty
+  goal_str: "stack one blue block on the other blue block"
+policy:
+  _target_: vtamp.policies.ours.policy.Ours
+  max_feedbacks: 5
+  max_csp_samples: 100
+updater:
+  _target_: vtamp.environments.raven.env.RavenVisionBeliefUpdater

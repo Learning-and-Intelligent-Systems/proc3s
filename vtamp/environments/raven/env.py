@@ -6,43 +6,74 @@ import math
 import os
 import time
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
+import cv2
 import imageio
+import matplotlib.pyplot as plt
 import numpy as np
 import pybullet as p
 import pybullet_data
 import pybullet_utils.bullet_client as bc
 import tensorflow.compat.v1 as tf  # type: ignore
+import torch
 
 import vtamp.environments.pb_utils as pbu
-from vtamp.environments.utils import Action, Environment, Task, Updater
+from vtamp.environments.robots.panda import PandaRobot
+from vtamp.environments.robots.robot import Robot
+from vtamp.environments.robots.ur5 import UR5Robot
+from vtamp.environments.utils import (
+    MODELS_PATH,
+    Action,
+    Environment,
+    Pose,
+    Task,
+    Updater,
+)
 from vtamp.utils import get_log_dir
+import trimesh
+import vtamp.perception.grounded_sam as gsam
 
 log = logging.getLogger(__name__)
+
+
+
+# Hammer fall params
+# LATERAL_FRICTION = 10.0
+# ROLLING_FRICTION = 0.001
+# SPINNING_FRICTION = 0.001
+
+# Normal params
+OBJ_LATERAL_FRICTION = 0.5
+OBJ_ROLLING_FRICTION = 0.1
+OBJ_SPINNING_FRICTION = 0.1
+
 BLOCK_SIZE = 0.04
-MODELS_PATH = os.path.join(os.path.dirname(__file__), "../../models/")
-VILD_CHECKPOINT_PATH = os.path.join(
-    os.path.dirname(__file__), "../../../checkpoints/image_path_v2"
-)
+# COLORS = {
+    # "blue": (78 / 255, 121 / 255, 167 / 255, 255 / 255),
+    # "red": (255 / 255, 87 / 255, 89 / 255, 255 / 255),
+    # "green": (89 / 255, 169 / 255, 79 / 255, 255 / 255),
+    # "yellow": (237 / 255, 201 / 255, 72 / 255, 255 / 255),
+    # "orange": (251 / 255, 106 / 255, 74 / 255, 255 / 255),
+    # "purple": (123 / 255, 102 / 255, 210 / 255, 255 / 255),
+    # "pink": (247 / 255, 104 / 255, 161 / 255, 255 / 255),
+    # "teal": (68 / 255, 170 / 255, 153 / 255, 255 / 255),
+# }
 COLORS = {
-    "blue": (78 / 255, 121 / 255, 167 / 255, 255 / 255),
-    "red": (255 / 255, 87 / 255, 89 / 255, 255 / 255),
-    "green": (89 / 255, 169 / 255, 79 / 255, 255 / 255),
-    "yellow": (237 / 255, 201 / 255, 72 / 255, 255 / 255),
-    "orange": (251 / 255, 106 / 255, 74 / 255, 255 / 255),
-    "purple": (123 / 255, 102 / 255, 210 / 255, 255 / 255),
-    "pink": (247 / 255, 104 / 255, 161 / 255, 255 / 255),
-    "teal": (68 / 255, 170 / 255, 153 / 255, 255 / 255),
-    "brown": (166 / 255, 86 / 255, 40 / 255, 255 / 255),
+    "blue": (70 / 255, 70 / 255, 255 / 255, 255 / 255),
+    "red": (255 / 255, 70 / 255, 70 / 255, 255 / 255),
+    # "green": (89 / 255, 169 / 255, 79 / 255, 255 / 255),
+    # "yellow": (237 / 255, 201 / 255, 72 / 255, 255 / 255),
+    # "orange": (251 / 255, 106 / 255, 74 / 255, 255 / 255),
+    # "purple": (123 / 255, 102 / 255, 210 / 255, 255 / 255),
+    # "pink": (247 / 255, 104 / 255, 161 / 255, 255 / 255),
+    # "teal": (68 / 255, 170 / 255, 153 / 255, 255 / 255),
 }
 
 
+
 PIXEL_SIZE = 0.00267857
-TABLE_BOUNDS = np.float32([[-0.3, 0.3], [-0.8, -0.2], [0, 0]])
-EE_LINK_ID = 9
-TIP_LINK_ID = 10
-DEFAULT_JOINT_ANGLES = [np.pi / 2, -np.pi / 2, np.pi / 2, -np.pi / 2, 3 * np.pi / 2, 0]
+TABLE_BOUNDS = np.float32([[-0.4, 0.4], [-0.8, -0.2], [0, 0]])
 WORKSPACE_SIZE = 0.3
 TABLE_CENTER = [0, -0.5, 0]
 
@@ -51,50 +82,15 @@ __all__ = [
     "RavenPose",
     "RavenObject",
     "RavenBelief",
+    "RavenState",
     "TABLE_BOUNDS",
     "BLOCK_SIZE",
     "TABLE_CENTER",
 ]
 
 
-@dataclass
-class RavenPose:
-    x: float = 0
-    y: float = 0
-    z: float = 0
-    roll: float = 0
-    pitch: float = 0
-    yaw: float = 0
-
-    def __iter__(self):
-        return iter([self.x, self.y, self.z, self.roll, self.pitch, self.yaw])
-
-    @property
-    def point(self):
-        return pbu.Point(self.x, self.y, self.z)
-
-    @property
-    def euler(self):
-        return pbu.Euler(self.roll, self.pitch, self.yaw)
-
-    @property
-    def quat(self):
-        return pbu.quat_from_euler(self.euler)
-
-    def to_pbu(self):
-        return pbu.Pose(point=self.point, euler=self.euler)
-
-    @staticmethod
-    def from_pbu(pose):
-        euler = pbu.euler_from_quat(pose[1])
-        return RavenPose(*pose[0], *euler)
-
-    def dist(self, pose: RavenPose, rot_scale: float = 1e-1) -> float:
-        pos_distance, ori_distance = pbu.get_pose_distance(self.to_pbu(), pose.to_pbu())
-        return pos_distance + ori_distance * rot_scale
-
-    def multiply(self, pose: RavenPose) -> RavenPose:
-        return RavenPose.from_pbu(pbu.multiply(self.to_pbu(), pose.to_pbu()))
+class RavenPose(Pose):
+    pass
 
 
 HOME_EE_POSE = RavenPose(x=0, y=-0.5, z=0.2, roll=np.pi, pitch=0, yaw=-np.pi / 2.0)
@@ -164,6 +160,122 @@ def transform_pointcloud(points, transform):
     return points
 
 
+
+
+ROOT_PATH = os.path.abspath(os.path.join(__file__, *[os.pardir] * 3))
+YCB_PATH = os.path.join(ROOT_PATH, "models/ycb")
+
+
+def ycb_type_from_name(name):
+    return "_".join(name.split("_")[1:])
+
+
+def ycb_type_from_file(path):
+    # TODO: rename to be from_dir
+    return ycb_type_from_name(os.path.basename(path))
+
+
+def all_ycb_names():
+    return [ycb_type_from_file(path) for path in pbu.list_paths(YCB_PATH)]
+
+
+def all_ycb_paths():
+    return pbu.list_paths(YCB_PATH)
+
+
+def get_ycb_obj_path(ycb_type, use_concave=False):
+    path_from_type = {
+        ycb_type_from_file(path): path
+        for path in pbu.list_paths(YCB_PATH)
+        if os.path.isdir(path)
+    }
+
+    if ycb_type not in path_from_type:
+        return None
+
+    if use_concave:
+        filename = "google_16k/decomp.obj"
+    else:
+        filename = "google_16k/textured.obj"
+
+    return os.path.join(path_from_type[ycb_type], filename)
+
+
+def ycb_type_from_name(name):
+    return name.split("_", 1)[-1]
+
+
+def ycb_type_from_file(path):
+    # TODO: rename to be from_dir
+    return ycb_type_from_name(os.path.basename(path))
+
+
+def get_ycb_obj_path(ycb_type, use_concave=False):
+    path_from_type = {
+        ycb_type_from_file(path): path
+        for path in pbu.list_paths(YCB_PATH)
+        if os.path.isdir(path)
+    }
+
+    if ycb_type not in path_from_type:
+        return None
+
+    if use_concave:
+        filename = "google_16k/textured_vhacd.obj"
+    else:
+        filename = "google_16k/textured.obj"
+
+    return os.path.join(path_from_type[ycb_type], filename)
+
+
+def create_ycb(
+    name,
+    use_concave=True,
+    client=None,
+    scale=1.0,
+    **kwargs,
+):
+    concave_ycb_path = get_ycb_obj_path(name, use_concave=use_concave)
+    ycb_path = get_ycb_obj_path(name)
+    mass = 0.02
+
+    # TODO: separate visual and collision boddies
+    color = pbu.WHITE
+
+    mesh = trimesh.load(ycb_path)
+
+    # TODO: separate visual and collision geometries
+    # TODO: compute OOBB to select the orientation
+    visual_geometry = pbu.get_mesh_geometry(
+        ycb_path, scale=scale
+    )  # TODO: randomly transform
+    collision_geometry = pbu.get_mesh_geometry(concave_ycb_path, scale=scale)
+    geometry_pose = pbu.Pose(point=-mesh.center_mass)
+    collision_id = pbu.create_collision_shape(
+        collision_geometry, pose=geometry_pose, client=client
+    )
+    visual_id = pbu.create_visual_shape(
+        visual_geometry, color=color, pose=geometry_pose, client=client
+    )
+    body = client.createMultiBody(
+        baseMass=mass,
+        baseCollisionShapeIndex=collision_id,
+        baseVisualShapeIndex=visual_id,
+    )
+
+    client.changeDynamics(
+        body,
+        -1,
+        lateralFriction=OBJ_LATERAL_FRICTION,
+        spinningFriction=OBJ_SPINNING_FRICTION,
+        rollingFriction=OBJ_ROLLING_FRICTION,
+        frictionAnchor=True,
+    )
+
+    pbu.set_all_color(body, pbu.apply_alpha(color, alpha=1.0), client=client)
+
+    return body
+
 def create_object(category: str, color: str, client: int) -> int:
     if category == "block":
         REDUCED_BS = BLOCK_SIZE
@@ -175,7 +287,7 @@ def create_object(category: str, color: str, client: int) -> int:
             p.GEOM_BOX,
             halfExtents=[BLOCK_SIZE / 2.0, BLOCK_SIZE / 2.0, BLOCK_SIZE / 2.0],
         )
-        object_id = client.createMultiBody(0.5, object_shape, object_visual)
+        object_id = client.createMultiBody(0.01, object_shape, object_visual)
         client.changeVisualShape(object_id, -1, rgbaColor=COLORS[color])
     elif category == "bowl":
         object_id = client.loadURDF(
@@ -184,9 +296,11 @@ def create_object(category: str, color: str, client: int) -> int:
         )
         client.changeVisualShape(object_id, -1, rgbaColor=COLORS[color])
     else:
-        raise NotImplementedError
+        print("Creating ycb")
+        object_id = create_ycb(category, client=client)
 
     return object_id
+
 
 
 ROOT_PATH = os.path.abspath(os.path.join(__file__, *[os.pardir] * 3))
@@ -198,173 +312,166 @@ class RavenGroundTruthBeliefUpdater(Updater):
         return obs["internal_state"]
 
 
-class Robotiq2F85:
-    """Gripper handling for Robotiq 2F85."""
+class RavenVisionBeliefUpdater(Updater):
+    def __init__(self, category_names = {"bowl":"bowl", "block":"block"}, box_threshold=0.2, text_threshold=0.2):
+        
+        self.last_belief = None
+        self.category_names = category_names
 
-    def __init__(self, robot, tool, teleport=False, client=None):
-        self.robot = robot
-        self.tool = tool
-        self.client = client
-        self.teleport = teleport
-        pos = [0.1339999999999999, -0.49199999999872496, 0.5]
-        rot = self.client.getQuaternionFromEuler([np.pi, 0, np.pi])
+        self.grounded_checkpoint = "./checkpoints/gsam/groundingdino_swint_ogc.pth"
+        self.sam_checkpoint = "./checkpoints/gsam/sam_vit_h_4b8939.pth"
+        self.config = "./checkpoints/gsam/config.py"
 
-        urdf = os.path.join(MODELS_PATH, "robotiq_2f_85/robotiq_2f_85.urdf")
+        self.device = "cpu"
+        # self.model = gsam.load_model(
+        #     self.config, self.grounded_checkpoint, device=self.device
+        # )
+        # self.box_threshold = box_threshold
+        # self.text_threshold = text_threshold
+        # self.sam_version = "vit_h"
 
-        self.body = self.client.loadURDF(urdf, pos, rot)
+        # self.predictor = gsam.SamPredictor(
+        #     gsam.sam_model_registry[self.sam_version](
+        #         checkpoint=self.sam_checkpoint
+        #     ).to(self.device)
+        # )
 
-        # Get the number of joints and links
-        num_joints = self.client.getNumJoints(self.body)
 
-        # Get the link index for the new rectangular prism link
-        rect_prism_link_index = -1
+    def closest_predefined_color(self, pointcloud):
+        """Find the predefined color closest to the mean color of the pointcloud."""
+        
+        # Convert pointcloud to a NumPy array if it is not already
+        pointcloud = np.array(pointcloud)
+        
+        # Validate pointcloud
+        if pointcloud.ndim != 2 or pointcloud.shape[1] < 3:
+            raise ValueError("pointcloud should be a 2D array with at least 3 columns for RGB values")
+        
+        # Check if the pointcloud is empty
+        if pointcloud.size == 0:
+            raise ValueError("pointcloud is empty")
+        
+        # Compute the mean color of the pointcloud
+        mean_color = np.mean(pointcloud[:, :3], axis=0)
+        print("mean color: "+str(mean_color))
+        # Convert predefined colors to a NumPy array
+        color_names = []
+        color_values = []
+        for color_name, color_value in COLORS.items():
+            color_names.append(color_name)
+            color_values.append(color_value)
+        color_values = np.array(color_values)
 
-        for i in range(num_joints):
-            joint_info = self.client.getJointInfo(self.body, i)
-            log.info(joint_info[12])
-            if joint_info[12].decode("utf-8") == "rect_prism_link":
-                rect_prism_link_index = i
-                break
+        # Initialize variables to store the closest color
+        closest_color_name = None
+        min_distance = float("inf")
 
-        # Set collision filters
-        if rect_prism_link_index != -1:
-            for i in range(num_joints):
-                if i != rect_prism_link_index:
-                    # Disable collision between the rectangular prism link and other links
-                    self.client.setCollisionFilterPair(
-                        self.body, self.body, rect_prism_link_index, i, 0
-                    )
+        # Iterate over each predefined color
+        for color_value, color_name in zip(color_values, color_names):
+            # Calculate the squared Euclidean distance from the mean color
+            distance = np.linalg.norm(mean_color - color_value[:3])
 
-        self.n_joints = self.client.getNumJoints(self.body)
-        self.activated = False
-        self.gripper_T_arm = pbu.Pose(
-            pbu.Point(0, 0, -0.015), pbu.Euler(0, 0, np.pi / 2)
-        )
-        # Connect gripper base to robot tool.
-        self.client.createConstraint(
-            self.robot,
-            tool,
-            self.body,
-            -1,
-            jointType=p.JOINT_FIXED,
-            jointAxis=[0, 0, 0],
-            parentFramePosition=[0, 0, 0],
-            childFramePosition=self.gripper_T_arm[0],
-            childFrameOrientation=self.gripper_T_arm[1],
-        )
+            # Find the color with the smallest distance
+            if distance < min_distance:
+                min_distance = distance
+                closest_color_name = color_name
 
-        # Set friction coefficients for gripper fingers.
-        for i in range(self.client.getNumJoints(self.body)):
-            self.client.changeDynamics(
-                self.body,
-                i,
-                lateralFriction=10.0,
-                spinningFriction=1.0,
-                rollingFriction=1.0,
-                frictionAnchor=True,
+        print(closest_color_name)
+        return closest_color_name
+
+    def update(self, obs) -> RavenBelief:
+        if self.last_belief is None:
+            image_path = os.path.join(get_log_dir(), "tmp.png")
+            camera_image: pbu.CameraImage = obs["image_side"]
+
+            imageio.imsave(image_path, camera_image.rgbPixels)
+
+            image_pil, image = gsam.load_image(image_path)
+            boxes_filt, pred_phrases = gsam.get_grounding_output(
+                self.model,
+                image,
+                " . ".join(self.category_names.keys()),
+                self.box_threshold,
+                self.text_threshold,
+                with_logits=False,
+                device=self.device,
+            )
+            image = cv2.imread(image_path)
+            image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+            original_image = copy.deepcopy(image)
+
+            self.predictor.set_image(image)
+
+            size = image_pil.size
+            H, W = size[1], size[0]
+            for i in range(boxes_filt.size(0)):
+                boxes_filt[i] = boxes_filt[i] * torch.Tensor([W, H, W, H])
+                boxes_filt[i][:2] -= boxes_filt[i][2:] / 2
+                boxes_filt[i][2:] += boxes_filt[i][:2]
+
+            boxes_filt = boxes_filt.cpu()
+            transformed_boxes = self.predictor.transform.apply_boxes_torch(
+                boxes_filt, image.shape[:2]
+            ).to(self.device)
+
+            masks, _, _ = self.predictor.predict_torch(
+                point_coords=None,
+                point_labels=None,
+                boxes=transformed_boxes.to(self.device),
+                multimask_output=False,
             )
 
-        # Start thread to handle additional gripper constraints.
-        self.motor_joint = 1
+            # draw output image
+            plt.figure(figsize=(10, 10))
+            plt.imshow(image)
+            for mask in masks:
+                gsam.show_mask(mask.cpu().numpy(), plt.gca(), random_color=True)
+            for box, label in zip(boxes_filt, pred_phrases):
+                gsam.show_box(box.numpy(), plt.gca(), label)
 
-    def apply_transform(self):
-        world_T_arm = pbu.get_link_pose(self.robot, self.tool, client=self.client)
-        world_T_gripper = pbu.multiply(world_T_arm, pbu.invert(self.gripper_T_arm))
-        pbu.set_pose(self.body, world_T_gripper, client=self.client)
-
-    def update_gripper(self):
-        """Update joint positions to enforce constraints on gripper
-        behavior."""
-        # This method now directly mirrors what was previously done in the `step` method within a thread.
-        try:
-            currj = [
-                self.client.getJointState(self.body, i)[0] for i in range(self.n_joints)
-            ]
-            indj = [6, 3, 8, 5, 10]
-            targj = [currj[1], -currj[1], -currj[1], currj[1], currj[1]]
-            self.client.setJointMotorControlArray(
-                self.body,
-                indj,
-                self.client.POSITION_CONTROL,
-                targj,
-                positionGains=np.ones(5),
+            plt.axis("off")
+            plt.savefig(
+                os.path.join(get_log_dir(), "grounded_sam_output.jpg"),
+                bbox_inches="tight",
+                dpi=300,
+                pad_inches=0.0,
             )
-        except Exception as e:
-            print(f"Failed to update gripper: {e}")
 
-        # world_T_arm = pbu.get_link_pose(self.robot, self.tool, client=self.client)
-        # world_T_gripper = pbu.get_link_pose(self.body, -1, client=self.client)
-        # if(not self.teleport):
-        #     print(f"Real arm_T_gripper: "+str(pbu.multiply(pbu.invert(world_T_arm), world_T_gripper)))
+            points = get_pointcloud(
+                camera_image.depthPixels, camera_image.camera_matrix
+            )
 
-    # Close gripper fingers.
-    def activate(self):
-        self.client.setJointMotorControl2(
-            self.body,
-            self.motor_joint,
-            self.client.VELOCITY_CONTROL,
-            targetVelocity=1,
-            force=5,
-        )
-        self.activated = True
+            position = np.float32(camera_image.camera_pose[0]).reshape(3, 1)
+            rotation = p.getMatrixFromQuaternion(camera_image.camera_pose[1])
+            rotation = np.float32(rotation).reshape(3, 3)
+            transform = np.eye(4)
+            transform[:3, :] = np.hstack((rotation, position))
+            pointcloud = transform_pointcloud(points, transform)
 
-    # Open gripper fingers.
-    def release(self):
-        self.client.setJointMotorControl2(
-            self.body,
-            self.motor_joint,
-            self.client.VELOCITY_CONTROL,
-            targetVelocity=-1,
-            force=5,
-        )
-        self.activated = False
+            self.last_belief = RavenBelief(observations=[obs])
 
-    # If activated and object in gripper: check object contact.
-    # If activated and nothing in gripper: check gripper contact.
-    # If released: check proximity to surface (disabled).
-    def detect_contact(self):
-        obj, _, ray_frac = self.check_proximity()
-        if self.activated:
-            empty = self.grasp_width() < 0.01
-            cbody = self.body if empty else obj
-            if obj == self.body or obj == 0:
-                return False
-            return self.external_contact(cbody)
+            for i, (box, category) in enumerate(zip(boxes_filt, pred_phrases)):
+                segmentation = masks[i, ...].squeeze()
+                seg_xs, seg_ys = np.where(segmentation > 0)
+                mean_xyz = np.mean(pointcloud[seg_xs, seg_ys, :], axis=0)
+                crop_rgb = original_image[seg_xs, seg_ys, :] / 256.0
+                xyz = mean_xyz.tolist()
+                xyz[2] = BLOCK_SIZE / 2.0
+                object = RavenObject(
+                    category=self.category_names[category],
+                    color=self.closest_predefined_color(crop_rgb),
+                    pose=RavenPose(*xyz),
+                )
+                self.last_belief.objects[f"object_{i}"] = object
 
-    #   else:
-    #     return ray_frac < 0.14 or self.external_contact()
-
-    # Return if body is in contact with something other than gripper
-    def external_contact(self, body=None):
-        if body is None:
-            body = self.body
-        pts = self.client.getContactPoints(bodyA=body)
-        pts = [pt for pt in pts if pt[2] != self.body]
-        return len(pts) > 0  # pylint: disable=g-explicit-length-test
-
-    def check_grasp(self):
-        while self.moving():
-            time.sleep(0.001)
-        success = self.grasp_width() > 0.01
-        return success
-
-    def grasp_width(self):
-        lpad = np.array(self.client.getLinkState(self.body, 4)[0])
-        rpad = np.array(self.client.getLinkState(self.body, 9)[0])
-        dist = np.linalg.norm(lpad - rpad) - 0.047813
-        return dist
-
-    def check_proximity(self):
-        ee_pos = np.array(self.client.getLinkState(self.robot, self.tool)[0])
-        tool_pos = np.array(self.client.getLinkState(self.body, 0)[0])
-        vec = (tool_pos - ee_pos) / np.linalg.norm((tool_pos - ee_pos))
-        ee_targ = ee_pos + vec
-        ray_data = self.client.rayTest(ee_pos, ee_targ)[0]
-        obj, link, ray_frac = ray_data[0], ray_data[1], ray_data[2]
-        return obj, link, ray_frac
+        new_belief = copy.deepcopy(self.last_belief)
+        new_belief.observations.append(obs)
+        return new_belief
 
 
-def setup_raven_environment(gui=False, teleport=False):
+def setup_raven_environment(
+    robot_type="ur5", real_robot=False, gui=False, teleport=False
+) -> Tuple[int, Robot]:
     dt = 1 / 480
     if gui:
         client = bc.BulletClient(connection_mode=p.GUI)
@@ -393,37 +500,25 @@ def setup_raven_environment(gui=False, teleport=False):
 
     # Add robot.
     client.loadURDF("plane.urdf", [0, 0, -0.001])
-    robot_id = client.loadURDF(
-        os.path.join(MODELS_PATH, "ur5e/ur5e.urdf"),
-        [0, 0, 0],
-        flags=p.URDF_USE_MATERIAL_COLORS_FROM_MTL,
-    )
-    joint_ids = [
-        client.getJointInfo(robot_id, i) for i in range(client.getNumJoints(robot_id))
-    ]
-    joint_ids = [j[0] for j in joint_ids if j[2] == p.JOINT_REVOLUTE]
 
-    # Move robot to home configuration.
-    for i in range(len(joint_ids)):
-        client.resetJointState(robot_id, joint_ids[i], DEFAULT_JOINT_ANGLES[i])
-
-    # Add gripper.
-    gripper = Robotiq2F85(robot_id, EE_LINK_ID, teleport=teleport, client=client)
-    gripper.release()
+    if robot_type == "ur5":
+        robot = UR5Robot(client)
+    elif robot_type == "panda":
+        robot = PandaRobot(client, real_robot=real_robot, teleport=teleport)
 
     # Add workspace.
     plane_shape = client.createCollisionShape(
-        p.GEOM_BOX, halfExtents=[WORKSPACE_SIZE, WORKSPACE_SIZE, 0.001]
+        p.GEOM_BOX, halfExtents=[0.4, WORKSPACE_SIZE, 0.001]
     )
     plane_visual = client.createVisualShape(
-        p.GEOM_BOX, halfExtents=[WORKSPACE_SIZE, WORKSPACE_SIZE, 0.001]
+        p.GEOM_BOX, halfExtents=[0.4, WORKSPACE_SIZE, 0.001]
     )
     plane_id = client.createMultiBody(
         0, plane_shape, plane_visual, basePosition=TABLE_CENTER
     )
     client.changeVisualShape(plane_id, -1, rgbaColor=[0.2, 0.2, 0.2, 1.0])
     client.configureDebugVisualizer(p.COV_ENABLE_RENDERING, 1)
-    return client, gripper, robot_id, joint_ids
+    return client, robot
 
 
 class RavenEnv(Environment):
@@ -431,37 +526,32 @@ class RavenEnv(Environment):
         self,
         task: Task,
         render: bool = False,
-        seed: int = None,
         teleport: bool = False,
         is_twin: bool = False,
         record_video: bool = False,
         stability_check: bool = False,
+        robot_type: str = "ur5",
+        real_robot: bool = False,
+        real_camera: bool = False,
+        image_observations: bool = False,
         **kwargs,
     ):
-
         super().__init__(task)
         self.teleport = teleport
+        self.robot_type = robot_type
         self.stability_check = stability_check
-        self.is_twin = False
+        self.image_observations = image_observations
+
         if is_twin:
             self.log_prefix = "[Twin]"
-            self.is_twin = True
         else:
             self.log_prefix = "[Main]"
 
-        self.attachments = []
-        if seed is None:
-            self.seed = np.random.randint(1, 2**8)
-        else:
-            self.seed = seed
-
         self.sim_step = 0
-        (
-            self.client,
-            self.gripper,
-            self.robot_id,
-            self.joint_ids,
-        ) = setup_raven_environment(gui=render, teleport=teleport)
+        (self.client, self.robot) = setup_raven_environment(
+            robot_type=robot_type, gui=render, teleport=teleport, real_robot=real_robot
+        )
+        self.real_camera = real_camera
         self.internal_state = None
         self.record_video = record_video
         if self.record_video:
@@ -469,30 +559,34 @@ class RavenEnv(Environment):
                 p.STATE_LOGGING_VIDEO_MP4,
                 os.path.join(get_log_dir(), f"replay.mp4"),
             )
-        self.debug_render = render
 
     def close(self):
         if self.record_video:
             self.client.stopStateLogging(self.video_recorder)
 
         # Take image of last state of sim
-        camera_image, _, _, _, _ = self.get_camera_image_side(
-            image_size=(460 * 2, 640 * 2)
+        camera_image = self.get_camera_image_side()
+        imageio.imsave(
+            os.path.join(get_log_dir(), f"final_frame.png"), camera_image.rgbPixels
         )
-        imageio.imsave(os.path.join(get_log_dir(), f"final_frame.png"), camera_image)
 
     @staticmethod
     def sample_twin(
-        real_env: RavenEnv, belief: RavenBelief, task: Task, render: bool = False
+        real_env: RavenEnv,
+        belief: RavenBelief,
+        task: Task,
+        robot_type: str = "ur5",
+        render: bool = False,
+        **kwargs,
     ) -> RavenEnv:
         twin_state = copy.deepcopy(belief)
         twin_env = RavenEnv(
             task=task,
             teleport=True,
-            render=render,
+            render=True,
             is_twin=True,
+            robot_type=robot_type,
             stability_check=real_env.stability_check,
-            record_video=True
         )
         for obj_name, object in twin_state.objects.items():
             obj_id = create_object(
@@ -513,7 +607,7 @@ class RavenEnv(Environment):
         return (u, v)
 
     def reset(self):
-        self.attachments = []
+        self.robot.attachments = []
         if self.internal_state is None:
             self.internal_state = self.task.setup_env(client=self.client)
 
@@ -525,55 +619,23 @@ class RavenEnv(Environment):
                 int(obj.body), obj.pose.point, obj.pose.quat
             )
 
-        # pbu.wait_if_gui(debug=self.is_twin and self.debug_render, client=self.client)
+        # pbu.wait_if_gui(client=self.client)
         return self.get_observation()
 
-    def apply_attachments(self):
-        for attachment in self.attachments:
-            attachment.assign(client=self.client)
-
-    def servoj(self, joints):
-        """Move to target joint positions with position control."""
-        if self.teleport:
-            pbu.set_joint_positions(
-                self.robot_id, self.joint_ids, joints, client=self.client
-            )
-            self.gripper.apply_transform()
-            self.apply_attachments()
-        else:
-            self.client.setJointMotorControlArray(
-                bodyIndex=self.robot_id,
-                jointIndices=self.joint_ids,
-                controlMode=p.POSITION_CONTROL,
-                targetPositions=joints,
-                positionGains=[0.005] * 6,
-            )
-
-    def movep(self, pose: RavenPose):
-        """Move to target end effector position."""
-        joints = self.client.calculateInverseKinematics(
-            bodyUniqueId=self.robot_id,
-            endEffectorLinkIndex=TIP_LINK_ID,
-            targetPosition=pose.point,
-            targetOrientation=self.client.getQuaternionFromEuler(pose.euler),
-            maxNumIterations=100,
-        )
-        self.servoj(joints)
-
     def get_env_collisions(self):
-        collisions_check = {
-            "gripper finger": self.gripper.body,
-            "robot arm body": self.robot_id,
-        } | {"held object": a.child for a in self.attachments}
+        collisions_check = self.robot.get_collision_map() | {
+            "held object": a.child for a in self.robot.attachments
+        }
         collision_messages = []
         for obj_name, obj in self.internal_state.objects.items():
             if obj.body not in collisions_check.values():
                 for cc_name, cc in collisions_check.items():
-                    if pbu.pairwise_collision(cc, obj.body, client=self.client):
-                        collision_message = f"{self.log_prefix} Collision detected between {obj_name} object {cc_name}"
-                        log.info(collision_message)
-                        collision_messages.append(collision_message)
-                        # # pbu.wait_if_gui(client=self.client)
+                    if(cc is not None and obj.body is not None):
+                        if pbu.pairwise_collision(cc, obj.body, client=self.client):
+                            collision_message = f"{self.log_prefix} Collision detected between {obj_name} object {cc_name}"
+                            log.info(collision_message)
+                            collision_messages.append(collision_message)
+                        # pbu.wait_if_gui(client=self.client)
         return collision_messages
 
     def name_from_id(self, body_id):
@@ -586,36 +648,35 @@ class RavenEnv(Environment):
         # Currently, we decide kinematic attachment by distance between object centroid and tool tip
         for obj_name, obj in self.internal_state.objects.items():
             obj_pose = pbu.get_pose(obj.body, client=self.client)
-            world_T_tool = pbu.get_link_pose(
-                self.robot_id, TIP_LINK_ID, client=self.client
-            )
+            world_T_tool = self.robot.get_tool_pose()
             dist = np.linalg.norm(np.array(obj_pose[0]) - np.array(world_T_tool[0]))
             tool_T_obj = pbu.multiply(pbu.invert(world_T_tool), obj_pose)
             if dist < 0.025:
-                self.attachments.append(
+                self.robot.add_attachment(
                     pbu.Attachment(
-                        self.robot_id,
-                        TIP_LINK_ID,
+                        self.robot.get_id(),
+                        self.robot.get_tool_id(),
                         tool_T_obj,
                         obj.body,
                         client=self.client,
                     )
                 )
 
-    def move(self, dest: RavenPose, max_steps=500):
-        ee_pose = RavenPose.from_pbu(
-            self.client.getLinkState(self.robot_id, TIP_LINK_ID)
+    def move(self, dest: Pose, max_steps=1000, teleport=False, interp=False):
+        ee_pose = Pose.from_pbu(
+            self.client.getLinkState(self.robot.get_id(), self.robot.get_tool_id())
         )
         step = 0
         while dest.dist(ee_pose) > 0.005 and step < max_steps:
-            self.movep(dest)
-            self.step_sim_and_render(teleport=self.teleport)
-            ee_pose = RavenPose.from_pbu(
-                self.client.getLinkState(self.robot_id, TIP_LINK_ID)
-            )
-            if self.teleport:
+            terminate = self.robot.move(dest, teleport=teleport, interp=interp)
+            if terminate:
+                break
+            self.step_sim_and_render(teleport=teleport)
+            ee_pose = RavenPose.from_pbu(self.robot.get_tool_pose())
+            if teleport:
                 break
             step += 1
+
         return dest.dist(ee_pose) <= 0.005
 
     def step(self, action: Action):
@@ -646,38 +707,36 @@ class RavenEnv(Environment):
 
             # Move to prepick
             log.info(f"{self.log_prefix} Moving to hover")
-            ik_success &= self.move(hover_pose)
+            print(hover_pose)
+            ik_success &= self.move(hover_pose, teleport=self.teleport)
             collisions += self.get_env_collisions()
-            # pbu.wait_if_gui(debug=self.is_twin and self.debug_render, client=self.client, )
 
             # Move to pick
             log.info(f"{self.log_prefix} Moving to grasp")
-            ik_success &= self.move(pick_pose)
-            collisions += self.get_env_collisions()
+            ik_success &= self.move(pick_pose, teleport=self.teleport, interp=True)
+            # collisions += self.get_env_collisions()
 
-            # pbu.wait_if_gui(debug=self.is_twin and self.debug_render, client=self.client)
+            # pbu.wait_if_gui(client=self.client)
             # Close the gripper
             log.info(f"{self.log_prefix} Closing gripper")
             if not self.teleport:
-                self.gripper.activate()
+                self.robot.activate_gripper()
                 if not self.teleport:
                     for _ in range(240):
                         self.step_sim_and_render(teleport=self.teleport)
             else:
                 self.add_pick_attachments()
                 log.info(
-                    f"{self.log_prefix} Pick added {len(self.attachments)} attachments"
+                    f"{self.log_prefix} Pick added {len(self.robot.attachments)} attachments"
                 )
 
             # Back to prepick
-            # pbu.wait_if_gui(debug=self.is_twin and self.debug_render, client=self.client)
             log.info(f"{self.log_prefix} Moving back to hover")
-            ik_success &= self.move(hover_pose)
+            ik_success &= self.move(hover_pose, teleport=self.teleport, interp=True)
             collisions += self.get_env_collisions()
-            # pbu.wait_if_gui(debug=self.is_twin and self.debug_render, client=self.client)
 
         elif action.name == "place":
-            if self.teleport and len(self.attachments) == 0:
+            if self.teleport and len(self.robot.attachments) == 0:
                 return (
                     None,
                     0,
@@ -695,59 +754,53 @@ class RavenEnv(Environment):
 
             # Move to place location.
             log.info(f"{self.log_prefix} Moving to place location")
-            ik_success &= self.move(hover_pose)
+            ik_success &= self.move(hover_pose, teleport=self.teleport)
             collisions += self.get_env_collisions()
 
             # Place down object.
             log.info(f"{self.log_prefix} Placing object")
-            ik_success &= self.move(place_pose)
+            ik_success &= self.move(place_pose, teleport=self.teleport, interp=True)
             collisions += self.get_env_collisions()
 
-            if len(collisions) == 0:
-                if self.teleport:
-                    pose_before_place = pbu.get_pose(
-                        self.attachments[0].child, client=self.client
-                    )
-                    # Open gripper
-                    self.gripper.release()
-
-                    # Simulate the object falling
-                    for _ in range(500):
-                        self.step_sim_and_render(teleport=False)
-
-                    pose_after_place = pbu.get_pose(
-                        self.attachments[0].child, client=self.client
-                    )
-                    pose_diff = RavenPose.from_pbu(pose_before_place).dist(
-                        RavenPose.from_pbu(pose_after_place)
-                    )
-                    log.info("pose_diff: " + str(pose_diff))
-                    # pbu.wait_if_gui(debug=self.is_twin and self.debug_render, client=self.client)
-                    if self.teleport and pose_diff > 0.04 and self.stability_check:
-                        # pbu.wait_if_gui(debug=self.is_twin and self.debug_render, client=self.client)
-                        return (
-                            None,
-                            0,
-                            False,
-                            {"constraint_violations": ["Unstable placement"]},
-                        )
-
-                    # Release kinematic attachments
-                    self.attachments = []
-
-            if not self.teleport:
+            if self.teleport:
+                pose_before_place = pbu.get_pose(
+                    self.robot.attachments[0].child, client=self.client
+                )
                 # Open gripper
-                self.gripper.release()
+                self.robot.release_gripper(teleport=True)
+
+                # Simulate the object falling
+                for _ in range(500):
+                    self.step_sim_and_render(teleport=False)
+
+                pose_after_place = pbu.get_pose(
+                    self.robot.attachments[0].child, client=self.client
+                )
+                pose_diff = RavenPose.from_pbu(pose_before_place).dist(
+                    RavenPose.from_pbu(pose_after_place)
+                )
+                log.info("pose_diff: " + str(pose_diff))
+                if self.teleport and pose_diff > 0.04 and self.stability_check:
+                    return (
+                        None,
+                        0,
+                        False,
+                        {"constraint_violations": ["Unstable placement"]},
+                    )
+
+                # Release kinematic attachments
+                self.robot.attachments = []
+            else:
+                # Open gripper
+                self.robot.release_gripper()
+
                 # Simulate the object falling
                 for _ in range(500):
                     self.step_sim_and_render(teleport=self.teleport)
-                # Release kinematic attachments
-                    self.attachments = []
 
             # back to preplace
             log.info(f"{self.log_prefix} Move up a little after placing")
-            ik_success &= self.move(hover_pose)
-            # pbu.wait_if_gui(debug=self.is_twin and self.debug_render, client=self.client)
+            ik_success &= self.move(hover_pose, teleport=self.teleport, interp=True)
 
         log.info(f"{self.log_prefix} Getting observation")
 
@@ -763,92 +816,65 @@ class RavenEnv(Environment):
         info = {"constraint_violations": collisions}
 
         if not ik_success:
-            # pbu.wait_if_gui(debug=self.is_twin and self.debug_render, client=self.client)
             info["constraint_violations"].append("IK Failure")
 
         self.client.stepSimulation()
         # log.info(info["constraint_violations"])
-        # pbu.wait_if_gui(debug=self.is_twin and self.debug_render, client=self.client)
+        # pbu.wait_if_gui(client=self.client)
 
         return observation, reward, done, info
-
-    def set_alpha_transparency(self, alpha: float) -> None:
-        for id in range(20):
-            visual_shape_data = self.client.getVisualShapeData(id)
-            for i in range(len(visual_shape_data)):
-                object_id, link_index, _, _, _, _, _, rgba_color = visual_shape_data[i]
-                rgba_color = list(rgba_color[0:3]) + [alpha]
-                self.client.changeVisualShape(
-                    self.robot_id, linkIndex=i, rgbaColor=rgba_color
-                )
-                self.client.changeVisualShape(
-                    self.gripper.body, linkIndex=i, rgbaColor=rgba_color
-                )
 
     def step_sim_and_render(self, teleport: bool):
         if not teleport:
             self.client.stepSimulation()
-            self.gripper.update_gripper()
+            self.robot.maintain_gripper()
             # time.sleep(0.001)
         self.sim_step += 1
 
     def get_camera_image_side(
         self,
-        image_size=(240, 240),
+        image_size=(460 * 2, 640 * 2),
         focal_length=1000.0,
         position=(0, -1.55, 0.60),
         orientation=(np.pi / 2.5, np.pi, np.pi),
     ):
         self.client.configureDebugVisualizer(p.COV_ENABLE_RENDERING, 0)
-        # self.set_alpha_transparency(0)
         camera_image = self.render_image(
             image_size, focal_length, position, orientation
         )
-        # self.set_alpha_transparency(1)
-        self.client.configureDebugVisualizer(p.COV_ENABLE_RENDERING, 1)
-        return camera_image
-
-    def get_camera_image_top(
-        self,
-        image_size=(240, 240),
-        focal_len=2000.0,
-        position=(0, -0.5, 5),
-        orientation=(0, np.pi, -np.pi / 2),
-        set_alpha=True,
-    ):
-        self.client.configureDebugVisualizer(p.COV_ENABLE_RENDERING, 0)
-        # set_alpha and self.set_alpha_transparency(0)
-        camera_image = self.render_image(image_size, focal_len, position, orientation)
-        # set_alpha and self.set_alpha_transparency(1)
         self.client.configureDebugVisualizer(p.COV_ENABLE_RENDERING, 1)
         return camera_image
 
     def get_reward(self):
         return self.task.get_reward(self)
 
+    def get_image(self) -> pbu.CameraImage:
+        if self.real_camera:
+            rgb, depth, intrinsics = self.robot.sender.capture_realsense()
+
+            # External camera
+            # camera_tform = np.load(
+            #     "/home/aidan/vlm-tamp/vtamp/environments/robots/calibration/captures/2024-08-12_16-36-54/032622073024/pose_gt.npy"
+            # )
+            # camera_pose = pbu.pose_from_tform(camera_tform)
+
+            camera_pose = self.robot.get_camera_pose()
+            camera_image = pbu.CameraImage(
+                rgb, depth / 1000.0, None, camera_pose, intrinsics
+            )
+            return camera_image
+
+        else:
+            return self.get_camera_image_side(
+                position=(0, -1, 0.5), orientation=(np.pi / 4.5, np.pi, np.pi)
+            )
+
     def get_observation(self):
         observation = {}
-
-        # Render current image.
-        # side_camera_image = self.get_camera_image_top()
-
-        # Get heightmaps and colormaps.
-        # color, depth, position, orientation, intrinsics = side_camera_image
-        # points = get_pointcloud(depth, intrinsics)
-        # position = np.float32(position).reshape(3, 1)
-        # rotation = self.client.getMatrixFromQuaternion(orientation)
-        # rotation = np.float32(rotation).reshape(3, 3)
-        # transform = np.eye(4)
-        # transform[:3, :] = np.hstack((rotation, position))
-        # points = transform_pointcloud(points, transform)
-        # colormap = self.get_heightmap(points, color, TABLE_BOUNDS, PIXEL_SIZE)
-
-        # observation["image"] = colormap
-        # observation["pointcloud"] = points
-        # observation["image_top"] = self.get_camera_image_top()
-        # observation["image_side"] = side_camera_image
-        observation["seed"] = self.seed
-        observation["internal_state"] = self.internal_state
+        if self.image_observations:
+            observation["image_side"] = self.get_image()
+        else:
+            observation["internal_state"] = self.internal_state
         return observation
 
     def render_image(
@@ -857,10 +883,9 @@ class RavenEnv(Environment):
         focal_len=2000,
         position=(0, -0.5, 5),
         orientation=(0, np.pi, -np.pi / 2),
-    ):
+    ) -> pbu.CameraImage:
         # Camera parameters.
         orientation = self.client.getQuaternionFromEuler(orientation)
-        noise = True
 
         # OpenGL camera settings.
         lookdir = np.float32([0, 0, 1]).reshape(3, 1)
@@ -880,7 +905,7 @@ class RavenEnv(Environment):
         projm = self.client.computeProjectionMatrixFOV(fovh, aspect_ratio, znear, zfar)
 
         # Render with OpenGL camera settings.
-        _, _, color, depth, segm = self.client.getCameraImage(
+        _, _, color, depth, _ = self.client.getCameraImage(
             width=image_size[1],
             height=image_size[0],
             viewMatrix=viewm,
@@ -894,27 +919,21 @@ class RavenEnv(Environment):
         color_image_size = (image_size[0], image_size[1], 4)
         color = np.array(color, dtype=np.uint8).reshape(color_image_size)
         color = color[:, :, :3]  # remove alpha channel
-        if noise:
-            color = np.int32(color)
-            color += np.int32(np.random.normal(0, 3, color.shape))
-            color = np.uint8(np.clip(color, 0, 255))
 
         # Get depth image.
         depth_image_size = (image_size[0], image_size[1])
         zbuffer = np.float32(depth).reshape(depth_image_size)
         depth = zfar + znear - (2 * zbuffer - 1) * (zfar - znear)
         depth = (2 * znear * zfar) / depth
-        if noise:
-            depth += np.random.normal(0, 0.003, depth.shape)
 
         intrinsics = np.zeros((3, 3))
 
         intrinsics[0, 0] = focal_len
         intrinsics[1, 1] = focal_len
-        intrinsics[0, 2] = image_size[0] / 2.0
-        intrinsics[1, 2] = image_size[0] / 2.0
+        intrinsics[0, 2] = image_size[1] / 2.0  # Width divided by 2
+        intrinsics[1, 2] = image_size[0] / 2.0  # Height divided by 2
 
-        return color, depth, position, orientation, intrinsics
+        return pbu.CameraImage(color, depth, None, (position, orientation), intrinsics)
 
     def get_heightmap(self, points, colors, bounds, pixel_size):
         """Get top-down (z-axis) orthographic heightmap image from 3D
