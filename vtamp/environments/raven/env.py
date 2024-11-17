@@ -387,82 +387,82 @@ class RavenVisionBeliefUpdater(Updater):
             imageio.imsave(image_path, camera_image.rgbPixels)
 
             image_pil, image = gsam.load_image(image_path)
-            boxes_filt, pred_phrases = gsam.get_grounding_output(
-                self.model,
-                image,
-                " . ".join(self.category_names.keys()),
-                self.box_threshold,
-                self.text_threshold,
-                with_logits=False,
-                device=self.device,
-            )
-            image = cv2.imread(image_path)
-            image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-            original_image = copy.deepcopy(image)
+            # boxes_filt, pred_phrases = gsam.get_grounding_output(
+            #     self.model,
+            #     image,
+            #     " . ".join(self.category_names.keys()),
+            #     self.box_threshold,
+            #     self.text_threshold,
+            #     with_logits=False,
+            #     device=self.device,
+            # )
+            # image = cv2.imread(image_path)
+            # image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+            # original_image = copy.deepcopy(image)
 
-            self.predictor.set_image(image)
+            # self.predictor.set_image(image)
 
-            size = image_pil.size
-            H, W = size[1], size[0]
-            for i in range(boxes_filt.size(0)):
-                boxes_filt[i] = boxes_filt[i] * torch.Tensor([W, H, W, H])
-                boxes_filt[i][:2] -= boxes_filt[i][2:] / 2
-                boxes_filt[i][2:] += boxes_filt[i][:2]
+            # size = image_pil.size
+            # H, W = size[1], size[0]
+            # for i in range(boxes_filt.size(0)):
+            #     boxes_filt[i] = boxes_filt[i] * torch.Tensor([W, H, W, H])
+            #     boxes_filt[i][:2] -= boxes_filt[i][2:] / 2
+            #     boxes_filt[i][2:] += boxes_filt[i][:2]
 
-            boxes_filt = boxes_filt.cpu()
-            transformed_boxes = self.predictor.transform.apply_boxes_torch(
-                boxes_filt, image.shape[:2]
-            ).to(self.device)
+            # boxes_filt = boxes_filt.cpu()
+            # transformed_boxes = self.predictor.transform.apply_boxes_torch(
+            #     boxes_filt, image.shape[:2]
+            # ).to(self.device)
 
-            masks, _, _ = self.predictor.predict_torch(
-                point_coords=None,
-                point_labels=None,
-                boxes=transformed_boxes.to(self.device),
-                multimask_output=False,
-            )
+            # masks, _, _ = self.predictor.predict_torch(
+            #     point_coords=None,
+            #     point_labels=None,
+            #     boxes=transformed_boxes.to(self.device),
+            #     multimask_output=False,
+            # )
 
-            # draw output image
-            plt.figure(figsize=(10, 10))
-            plt.imshow(image)
-            for mask in masks:
-                gsam.show_mask(mask.cpu().numpy(), plt.gca(), random_color=True)
-            for box, label in zip(boxes_filt, pred_phrases):
-                gsam.show_box(box.numpy(), plt.gca(), label)
+            # # draw output image
+            # plt.figure(figsize=(10, 10))
+            # plt.imshow(image)
+            # for mask in masks:
+            #     gsam.show_mask(mask.cpu().numpy(), plt.gca(), random_color=True)
+            # for box, label in zip(boxes_filt, pred_phrases):
+            #     gsam.show_box(box.numpy(), plt.gca(), label)
 
-            plt.axis("off")
-            plt.savefig(
-                os.path.join(get_log_dir(), "grounded_sam_output.jpg"),
-                bbox_inches="tight",
-                dpi=300,
-                pad_inches=0.0,
-            )
+            # plt.axis("off")
+            # plt.savefig(
+            #     os.path.join(get_log_dir(), "grounded_sam_output.jpg"),
+            #     bbox_inches="tight",
+            #     dpi=300,
+            #     pad_inches=0.0,
+            # )
 
-            points = get_pointcloud(
-                camera_image.depthPixels, camera_image.camera_matrix
-            )
+            # points = get_pointcloud(
+            #     camera_image.depthPixels, camera_image.camera_matrix
+            # )
 
-            position = np.float32(camera_image.camera_pose[0]).reshape(3, 1)
-            rotation = p.getMatrixFromQuaternion(camera_image.camera_pose[1])
-            rotation = np.float32(rotation).reshape(3, 3)
-            transform = np.eye(4)
-            transform[:3, :] = np.hstack((rotation, position))
-            pointcloud = transform_pointcloud(points, transform)
+            # position = np.float32(camera_image.camera_pose[0]).reshape(3, 1)
+            # rotation = p.getMatrixFromQuaternion(camera_image.camera_pose[1])
+            # rotation = np.float32(rotation).reshape(3, 3)
+            # transform = np.eye(4)
+            # transform[:3, :] = np.hstack((rotation, position))
+            # pointcloud = transform_pointcloud(points, transform)
 
             self.last_belief = RavenBelief(observations=[obs])
 
-            for i, (box, category) in enumerate(zip(boxes_filt, pred_phrases)):
-                segmentation = masks[i, ...].squeeze()
-                seg_xs, seg_ys = np.where(segmentation > 0)
-                mean_xyz = np.mean(pointcloud[seg_xs, seg_ys, :], axis=0)
-                crop_rgb = original_image[seg_xs, seg_ys, :] / 256.0
-                xyz = mean_xyz.tolist()
-                xyz[2] = BLOCK_SIZE / 2.0
-                object = RavenObject(
-                    category=self.category_names[category],
-                    color=self.closest_predefined_color(crop_rgb),
-                    pose=RavenPose(*xyz),
-                )
-                self.last_belief.objects[f"object_{i}"] = object
+            # for i, (box, category) in enumerate(zip(boxes_filt, pred_phrases)):
+            #     segmentation = masks[i, ...].squeeze()
+            #     seg_xs, seg_ys = np.where(segmentation > 0)
+            #     mean_xyz = np.mean(pointcloud[seg_xs, seg_ys, :], axis=0)
+            #     crop_rgb = original_image[seg_xs, seg_ys, :] / 256.0
+            #     xyz = mean_xyz.tolist()
+            #     xyz[2] = BLOCK_SIZE / 2.0
+            #     object = RavenObject(
+            #         category=self.category_names[category],
+            #         color=self.closest_predefined_color(crop_rgb),
+            #         pose=RavenPose(*xyz),
+            #     )
+            #     self.last_belief.objects[f"object_{i}"] = object
 
         new_belief = copy.deepcopy(self.last_belief)
         new_belief.observations.append(obs)
@@ -559,6 +559,7 @@ class RavenEnv(Environment):
                 p.STATE_LOGGING_VIDEO_MP4,
                 os.path.join(get_log_dir(), f"replay.mp4"),
             )
+
 
     def close(self):
         if self.record_video:
@@ -871,10 +872,8 @@ class RavenEnv(Environment):
 
     def get_observation(self):
         observation = {}
-        if self.image_observations:
-            observation["image_side"] = self.get_image()
-        else:
-            observation["internal_state"] = self.internal_state
+        observation["image_side"] = self.get_image()
+        observation["internal_state"] = self.internal_state
         return observation
 
     def render_image(

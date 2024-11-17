@@ -85,11 +85,12 @@ def main(cfg: OmegaConf):
     belief = updater.update(obs)
 
     twin_env: Environment = hydra.utils.get_class(cfg.env._target_).sample_twin(
-        env, belief, task, render=cfg.vis_debug
+        env, belief, task, render=cfg.vis_debug, robot_type=cfg.env.robot_type
     )
     policy: Policy = hydra.utils.instantiate(
         cfg.policy, twin=twin_env, seed=cfg["seed"]
     )
+
 
     statistics = {"execution_time": 0, "planning_time": 0}
     for i in range(cfg.get("max_env_steps")):
